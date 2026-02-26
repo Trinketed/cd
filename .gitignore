@@ -1,0 +1,9 @@
+.DS_Store
+Thumbs.db
+*.log
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+firebase-debug.log

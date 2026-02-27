@@ -222,7 +222,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
                 addon:RefreshAllBars()
             end
 
-            addon:Print("v" .. addon.VERSION .. " loaded")
+            addon:Print(addon.VERSION .. " loaded")
             RegisterSubCommands()
         end
 

@@ -2,7 +2,7 @@
 ## Title: Trinketed - Cooldowns
 ## Notes: Arena cooldown tracker
 ## Author: apwek
-## Version: @project-version@
+## Version: v0.1.2
 ## Dependencies: Trinketed
 ## SavedVariables: TrinketedCDDB
 

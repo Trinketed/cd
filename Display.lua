@@ -5,6 +5,9 @@
 TrinketedCD = TrinketedCD or {}
 local addon = TrinketedCD
 
+local lib = LibStub("TrinketedLib-1.0")
+local C = lib.C
+
 addon.bars = {}      -- [guid] -> bar container frame
 addon.icons = {}     -- [guid] -> { [spellName] -> icon frame }
 
@@ -41,7 +44,7 @@ function addon:CreateBar(guid)
     -- Background (visible only when unlocked)
     bar.bg = bar:CreateTexture(nil, "BACKGROUND")
     bar.bg:SetAllPoints()
-    bar.bg:SetColorTexture(0.039, 0.039, 0.039, 0)
+    bar.bg:SetColorTexture(C.sidebarBg[1], C.sidebarBg[2], C.sidebarBg[3], 0)
 
     -- Player name label (visible only when unlocked)
     bar.nameText = bar:CreateFontString(nil, "OVERLAY")
@@ -55,9 +58,9 @@ function addon:CreateBar(guid)
     bar.teamIndicator:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", 0, -1)
     bar.teamIndicator:SetPoint("TOPRIGHT", bar, "BOTTOMRIGHT", 0, -1)
     if info.team == "party" then
-        bar.teamIndicator:SetColorTexture(0.271, 0.482, 0.616, 0.8)
+        bar.teamIndicator:SetColorTexture(C.partyBlue[1], C.partyBlue[2], C.partyBlue[3], 0.8)
     else
-        bar.teamIndicator:SetColorTexture(0.902, 0.224, 0.224, 0.8)
+        bar.teamIndicator:SetColorTexture(C.enemyRed[1], C.enemyRed[2], C.enemyRed[3], 0.8)
     end
     bar.teamIndicator:Hide()
 
@@ -71,7 +74,7 @@ function addon:CreateBar(guid)
     local locked = self.db and self.db.general.locked
     bar:EnableMouse(not locked)
     if not locked then
-        bar.bg:SetColorTexture(0.039, 0.039, 0.039, 0.3)
+        bar.bg:SetColorTexture(C.sidebarBg[1], C.sidebarBg[2], C.sidebarBg[3], 0.3)
         bar.nameText:SetText(addon:ClassColorWrap(info.name, info.class))
         bar.nameText:SetAlpha(1)
         bar.nameText:Show()
@@ -604,7 +607,7 @@ function addon:UpdatePlayerBar(guid)
             bar:SetSize(
                 teamCols * (size + padding) - padding,
                 teamRows * (size + padding) - padding)
-            bar.bg:SetColorTexture(0.039, 0.039, 0.039, 0.3)
+            bar.bg:SetColorTexture(C.sidebarBg[1], C.sidebarBg[2], C.sidebarBg[3], 0.3)
             bar.nameText:Show()
             bar.teamIndicator:Show()
             bar:Show()
@@ -710,7 +713,7 @@ function addon:ToggleLock()
         bar:EnableMouse(not locked)
         local info = self.state.trackedPlayers[guid]
         if locked then
-            bar.bg:SetColorTexture(0.039, 0.039, 0.039, 0)
+            bar.bg:SetColorTexture(C.sidebarBg[1], C.sidebarBg[2], C.sidebarBg[3], 0)
             bar.teamIndicator:Hide()
             -- Show subtle player labels when locked if setting is on
             if self.db.general.showPlayerLabels and info then
@@ -721,7 +724,7 @@ function addon:ToggleLock()
                 bar.nameText:Hide()
             end
         else
-            bar.bg:SetColorTexture(0.039, 0.039, 0.039, 0.3)
+            bar.bg:SetColorTexture(C.sidebarBg[1], C.sidebarBg[2], C.sidebarBg[3], 0.3)
             if info then
                 bar.nameText:SetText(self:ClassColorWrap(info.name, info.class))
                 bar.nameText:SetAlpha(1)

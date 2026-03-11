@@ -44,7 +44,7 @@ addon.CD_CATEGORY_LABELS = {
 --   races     - (optional) restrict to specific races
 --   enabled   - default enabled state
 --   priority  - default sort order (lower = shown first)
---   sharedCD  - (optional) name of spell that shares cooldown
+--   sharedCD  - (optional) spell name or list of names that share cooldown
 --   sharedCDDuration - (optional) duration of shared CD if different
 --   isPetAbility - (optional) true if cast by pet, resolved to owner
 ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ addon.COOLDOWN_DB = {
         classes     = { "Warrior" },
         enabled     = true,
         priority    = 10,
-        sharedCD    = "Shield Wall",
+        sharedCD    = { "Shield Wall", "Retaliation" },
     },
     ["Death Wish"] = {
         spellID     = 12292,
@@ -106,7 +106,7 @@ addon.COOLDOWN_DB = {
         classes     = { "Warrior" },
         enabled     = true,
         priority    = 20,
-        sharedCD    = "Recklessness",
+        sharedCD    = { "Recklessness", "Retaliation" },
     },
     ["Retaliation"] = {
         spellID     = 20230,
@@ -116,7 +116,7 @@ addon.COOLDOWN_DB = {
         classes     = { "Warrior" },
         enabled     = true,
         priority    = 22,
-        sharedCD    = "Recklessness",
+        sharedCD    = { "Recklessness", "Shield Wall" },
     },
     ["Last Stand"] = {
         spellID     = 12975,
@@ -222,6 +222,7 @@ addon.COOLDOWN_DB = {
         classes     = { "Paladin" },
         enabled     = true,
         priority    = 20,
+        sharedCD    = "Divine Protection",
     },
     ["Divine Protection"] = {
         spellID     = 498,
@@ -230,10 +231,11 @@ addon.COOLDOWN_DB = {
         classes     = { "Paladin" },
         enabled     = true,
         priority    = 21,
+        sharedCD    = "Divine Shield",
     },
     ["Blessing of Protection"] = {
         spellID     = 10278,
-        duration    = 180,
+        duration    = 300,
         category    = "major_defensive",
         classes     = { "Paladin" },
         enabled     = true,
@@ -314,7 +316,7 @@ addon.COOLDOWN_DB = {
     },
     ["Readiness"] = {
         spellID     = 23989,
-        duration    = 180,
+        duration    = 300,
         category    = "major_offensive",
         classes     = { "Hunter" },
         enabled     = true,
@@ -596,7 +598,7 @@ addon.COOLDOWN_DB = {
         enabled     = true,
         priority    = 21,
         spec        = "Frost",
-        resets      = { "Ice Block", "Ice Barrier", "Summon Water Elemental", "Icy Veins" },
+        resets      = { "Ice Block", "Ice Barrier", "Summon Water Elemental", "Frost Nova", "Icy Veins" },
     },
     ["Icy Veins"] = {
         spellID     = 12472,
@@ -980,7 +982,7 @@ addon.COOLDOWN_DB = {
     },
     ["War Stomp"] = {
         spellID     = 20549,
-        duration    = 120,
+        duration    = 90,
         category    = "interrupt",
         classes     = { "ALL" },
         races       = { "Tauren" },
@@ -1108,27 +1110,96 @@ addon.SPEC_MARKERS = {
 addon.TALENT_CD_ADJUSTMENTS = {
     ["Rogue"] = {
         ["Subtlety"] = {
-            -- Elusiveness 2/2: reduces Evasion/Vanish CD by 60s, Blind CD by 60s
-            ["Evasion"] = 240,  -- 300 - 60
-            ["Vanish"]  = 240,  -- 300 - 60
-            ["Blind"]   = 120,  -- 180 - 60
+            -- Endurance 2/2 (Sub tier 1): -90s to Evasion, Sprint
+            -- Elusiveness 2/2 (Sub tier 5): -90s to Vanish, Blind
+            ["Evasion"] = 210,   -- 300 - 90
+            ["Sprint"]  = 210,   -- 300 - 90
+            ["Vanish"]  = 210,   -- 300 - 90
+            ["Blind"]   = 90,    -- 180 - 90
         },
-        ["Combat"] = {
-            -- Endurance 2/2: reduces Sprint CD by 60s; Elusiveness 2/2 for Evasion
-            ["Sprint"]  = 240,  -- 300 - 60
-            ["Evasion"] = 240,  -- 300 - 60
+        ["Assassination"] = {
+            -- Endurance 2/2 from 20pts Sub (standard 41/0/20)
+            ["Evasion"] = 210,   -- 300 - 90
+            ["Sprint"]  = 210,   -- 300 - 90
         },
+        -- Combat (20/41/0): no Sub talents, no adjustments
     },
     ["Warrior"] = {
         ["Arms"] = {
-            -- Improved Intercept 2/2: reduces Intercept CD by 10s
-            ["Intercept"] = 20,  -- 30 - 10
+            -- Improved Intercept 2/2 (Fury tier 4): -10s
+            ["Intercept"] = 20,         -- 30 - 10
+            -- Intensify Rage 3/3 (Fury tier 3): -600s
+            ["Recklessness"]  = 1200,   -- 1800 - 600
+            ["Shield Wall"]   = 1200,   -- 1800 - 600
+            ["Retaliation"]   = 1200,   -- 1800 - 600
+        },
+        ["Fury"] = {
+            ["Intercept"] = 20,
+            ["Recklessness"]  = 1200,
+            ["Shield Wall"]   = 1200,
+            ["Retaliation"]   = 1200,
         },
     },
     ["Mage"] = {
         ["Frost"] = {
-            -- Ice Floes 3/3: reduces Ice Block CD by 20%
-            ["Ice Block"] = 240,  -- 300 * 0.80
+            -- Ice Floes 3/3 (tier 1): -20% on Ice Block
+            -- Arctic Winds 5/5 (tier 8): additional x0.80 multiplicative
+            ["Ice Block"]   = 192,  -- 300 * 0.80 * 0.80
+            ["Cold Snap"]   = 384,  -- 480 * 0.80
+            ["Ice Barrier"] = 24,   -- 30 * 0.80
+            -- Improved Frost Nova 2/2 (tier 2): -4s
+            ["Frost Nova"]  = 21,   -- 25 - 4
+        },
+    },
+    ["Paladin"] = {
+        ["Holy"] = {
+            -- Guardian's Favor 2/2 (Prot tier 2): -120s
+            ["Blessing of Protection"] = 180,  -- 300 - 120
+            -- Improved HoJ 3/3 (Prot tier 3): -15s
+            ["Hammer of Justice"] = 45,         -- 60 - 15
+            -- Improved LoH 2/2 (Holy tier 2): -1200s
+            ["Lay on Hands"] = 2400,            -- 3600 - 1200
+        },
+        ["Retribution"] = {
+            -- Improved HoJ 3/3 (Prot tier 3)
+            ["Hammer of Justice"] = 45,
+        },
+        ["Protection"] = {
+            -- Sacred Duty 2/2 (Prot tier 7): -60s
+            ["Divine Shield"] = 240,            -- 300 - 60
+            ["Blessing of Protection"] = 180,
+            ["Hammer of Justice"] = 45,
+        },
+    },
+    ["Priest"] = {
+        -- Improved Psychic Scream 2/2 (Shadow tier 2): -4s
+        -- Taken by all PvP specs (only 10 Shadow pts needed)
+        ["Discipline"] = { ["Psychic Scream"] = 26 },
+        ["Holy"]       = { ["Psychic Scream"] = 26 },
+        ["Shadow"]     = { ["Psychic Scream"] = 26 },
+    },
+    ["Shaman"] = {
+        ["Elemental"] = {
+            -- Reverberation 5/5 (Ele tier 2): -1s on shocks
+            ["Earth Shock"] = 5,       -- 6 - 1
+        },
+        ["Enhancement"] = {
+            -- Enhancing Totems 2/2 (Enh tier 2): -2s
+            ["Grounding Totem"] = 13,  -- 15 - 2
+        },
+    },
+    ["Hunter"] = {
+        ["Survival"] = {
+            -- Resourcefulness 3/3 (Surv tier 5): -6s on traps
+            ["Freezing Trap"] = 24,    -- 30 - 6
+        },
+        ["Marksmanship"] = {
+            -- Rapid Killing 2/2 (MM tier 2): -120s
+            ["Rapid Fire"] = 180,      -- 300 - 120
+        },
+        ["Beast Mastery"] = {
+            -- Standard BM goes 41/20+ into MM, gets Rapid Killing
+            ["Rapid Fire"] = 180,
         },
     },
 }

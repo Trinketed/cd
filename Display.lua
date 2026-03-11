@@ -90,16 +90,205 @@ function addon:CreateBar(guid)
 end
 
 ---------------------------------------------------------------------------
+-- Unit Frame Detection (for party frame anchoring)
+---------------------------------------------------------------------------
+
+-- Registry for custom addon frame finders: { function(unit) -> frame or nil }
+addon.customUnitFrames = {}
+
+-- Find the Blizzard party frame for a given unit token (e.g. "party1")
+-- In test mode, falls back to finding frames by slot index since no real units exist
+function addon:FindUnitFrame(unit, slotIndex)
+    -- 1. Check custom addon frame finders
+    for _, finder in ipairs(self.customUnitFrames) do
+        local frame = finder(unit)
+        if frame and frame:IsVisible() then return frame end
+    end
+
+    -- In test mode, real units don't exist — match by slot index instead
+    local useSlotMatch = self.state.testMode or not UnitExists(unit)
+
+    if not useSlotMatch then
+        -- 2. CompactPartyFrame children (Retail party frames)
+        local compactParty = _G["CompactPartyFrame"]
+        if compactParty then
+            for _, child in pairs({ compactParty:GetChildren() }) do
+                if child.unit and child:IsVisible() then
+                    if UnitIsUnit(child.unit, unit) then return child end
+                end
+            end
+        end
+
+        -- 3. Compact raid-style party frames (CompactPartyFrameMember1-5)
+        for i = 1, 5 do
+            local frame = _G["CompactPartyFrameMember" .. i]
+            if frame and frame:IsVisible() and frame.unit then
+                if UnitIsUnit(frame.unit, unit) then return frame end
+            end
+        end
+
+        -- 4. Classic party frames (PartyMemberFrame1-4)
+        for i = 1, 4 do
+            local frame = _G["PartyMemberFrame" .. i]
+            if frame and frame:IsVisible() then
+                if UnitIsUnit("party" .. i, unit) then return frame end
+            end
+        end
+
+        -- 5. EditMode party frames (PartyFrame.MemberFrame1-4, Retail 10.0+)
+        local partyFrame = _G["PartyFrame"]
+        if partyFrame then
+            for i = 1, 4 do
+                local member = partyFrame["MemberFrame" .. i]
+                if member and member:IsVisible() and member.unit then
+                    if UnitIsUnit(member.unit, unit) then return member end
+                end
+            end
+        end
+    end
+
+    -- Slot-index fallback: find the Nth visible party frame regardless of unit matching
+    -- Used in test mode and when real unit lookup fails
+    if slotIndex and slotIndex >= 1 and slotIndex <= 4 then
+        -- Try CompactPartyFrame children by index
+        local compactParty = _G["CompactPartyFrame"]
+        if compactParty then
+            local visibleMembers = {}
+            for _, child in pairs({ compactParty:GetChildren() }) do
+                if child.unit and child:IsVisible() then
+                    visibleMembers[#visibleMembers + 1] = child
+                end
+            end
+            if visibleMembers[slotIndex] then return visibleMembers[slotIndex] end
+        end
+
+        -- Try CompactPartyFrameMember by index
+        local frame = _G["CompactPartyFrameMember" .. slotIndex]
+        if frame and frame:IsVisible() then return frame end
+
+        -- Try PartyMemberFrame by index
+        frame = _G["PartyMemberFrame" .. slotIndex]
+        if frame and frame:IsVisible() then return frame end
+
+        -- Try PartyFrame.MemberFrame by index
+        local partyFrame = _G["PartyFrame"]
+        if partyFrame then
+            local member = partyFrame["MemberFrame" .. slotIndex]
+            if member and member:IsVisible() then return member end
+        end
+    end
+
+    return nil
+end
+
+-- Find any visible party frame and its slot index (for extrapolation)
+function addon:FindAnyPartyFrame()
+    -- Check CompactPartyFrame children
+    local compactParty = _G["CompactPartyFrame"]
+    if compactParty then
+        for _, child in pairs({ compactParty:GetChildren() }) do
+            if child.unit and child:IsVisible() then
+                local idx = child.unit and tonumber(child.unit:match("party(%d+)"))
+                if idx then return child, idx end
+            end
+        end
+    end
+
+    for i = 1, 4 do
+        local frame = _G["CompactPartyFrameMember" .. i]
+        if frame and frame:IsVisible() then return frame, i end
+
+        frame = _G["PartyMemberFrame" .. i]
+        if frame and frame:IsVisible() then return frame, i end
+    end
+
+    local partyFrame = _G["PartyFrame"]
+    if partyFrame then
+        for i = 1, 4 do
+            local member = partyFrame["MemberFrame" .. i]
+            if member and member:IsVisible() then return member, i end
+        end
+    end
+
+    return nil, nil
+end
+
+-- Estimate vertical spacing between party frames by finding two visible ones
+function addon:EstimatePartyFrameSpacing(refFrame, refSlot)
+    for i = 1, 4 do
+        if i ~= refSlot then
+            local other = self:FindUnitFrame("party" .. i, i)
+            if other then
+                local _, refY = refFrame:GetCenter()
+                local _, otherY = other:GetCenter()
+                if refY and otherY then
+                    local diff = math.abs(refY - otherY) / math.abs(i - refSlot)
+                    return diff
+                end
+            end
+        end
+    end
+    return nil
+end
+
+---------------------------------------------------------------------------
 -- Bar Positioning
 ---------------------------------------------------------------------------
 function addon:PositionBar(guid)
     local bar = self.bars[guid]
     local info = self.state.trackedPlayers[guid]
-    if not bar or not info then return end
+    if not bar or not info or not self.db then return end
 
     bar:ClearAllPoints()
 
     if info.team == "party" then
+        -- Try anchoring to party unit frames
+        if self.db.party.anchorToFrames then
+            local unitFrame = self:FindUnitFrame(info.unit, info.slot)
+            self:Debug("FindUnitFrame(" .. (info.unit or "nil") .. ", slot " .. (info.slot or "?") .. ") = " .. (unitFrame and (unitFrame:GetName() or "anonymous") or "nil"))
+            if unitFrame then
+                local side = self.db.party.anchorSide or "RIGHT"
+                local offX = self.db.party.anchorOffsetX or 4
+                local offY = self.db.party.anchorOffsetY or 0
+                if side == "LEFT" then
+                    bar:SetPoint("TOPRIGHT", unitFrame, "TOPLEFT", -offX, offY)
+                else
+                    bar:SetPoint("TOPLEFT", unitFrame, "TOPRIGHT", offX, offY)
+                end
+                bar:SetParent(unitFrame)
+                return
+            end
+
+            -- Frame not found — extrapolate from a nearby frame that does exist
+            local refFrame, refSlot = self:FindAnyPartyFrame()
+            if refFrame and info.slot then
+                local slotDiff = info.slot - refSlot
+                local _, frameH = refFrame:GetSize()
+                -- Estimate spacing between party frames, with robust fallbacks
+                local spacing = self:EstimatePartyFrameSpacing(refFrame, refSlot)
+                if not spacing or spacing < 1 then
+                    spacing = (frameH and frameH > 1) and (frameH + 4) or 60
+                end
+                local side = self.db.party.anchorSide or "RIGHT"
+                local offX = self.db.party.anchorOffsetX or 4
+                local offY = (self.db.party.anchorOffsetY or 0) - (slotDiff * spacing)
+                if side == "LEFT" then
+                    bar:SetPoint("TOPRIGHT", refFrame, "TOPLEFT", -offX, offY)
+                else
+                    bar:SetPoint("TOPLEFT", refFrame, "TOPRIGHT", offX, offY)
+                end
+                bar:SetParent(refFrame:GetParent() or UIParent)
+                self:Debug("Extrapolated slot " .. info.slot .. " from frame slot " .. refSlot .. " (spacing=" .. spacing .. ", frameH=" .. (frameH or "nil") .. ", diff=" .. slotDiff .. ")")
+                return
+            end
+            -- Fall through to saved/default position if no frames found at all
+        end
+
+        -- Re-parent to UIParent if not anchored to a unit frame
+        if bar:GetParent() ~= UIParent then
+            bar:SetParent(UIParent)
+        end
+
         local saved = self.db.party.positions[tostring(info.slot)]
         if saved then
             bar:SetPoint(saved.point, UIParent, saved.relPoint, saved.x, saved.y)
@@ -123,7 +312,10 @@ end
 function addon:SaveBarPosition(guid)
     local bar = self.bars[guid]
     local info = self.state.trackedPlayers[guid]
-    if not bar or not info then return end
+    if not bar or not info or not self.db then return end
+
+    -- Don't save position when bar is anchored to a unit frame (coordinates are relative to it, not UIParent)
+    if info.team == "party" and self.db.party.anchorToFrames then return end
 
     local point, _, relPoint, x, y = bar:GetPoint()
     local settings = (info.team == "party") and self.db.party or self.db.enemy
@@ -174,32 +366,6 @@ function addon:CreateCooldownIcon(bar, guid, spellName)
         icon.texture:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
     end
     icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
-    -- Inner bevel: top/left shadow (light comes from top-left, creates depth)
-    icon.shadowTop = icon:CreateTexture(nil, "ARTWORK", nil, 3)
-    icon.shadowTop:SetPoint("TOPLEFT")
-    icon.shadowTop:SetPoint("TOPRIGHT")
-    icon.shadowTop:SetHeight(3)
-    icon.shadowTop:SetColorTexture(0, 0, 0, 0.35)
-
-    icon.shadowLeft = icon:CreateTexture(nil, "ARTWORK", nil, 3)
-    icon.shadowLeft:SetPoint("TOPLEFT", 0, -3)
-    icon.shadowLeft:SetPoint("BOTTOMLEFT")
-    icon.shadowLeft:SetWidth(3)
-    icon.shadowLeft:SetColorTexture(0, 0, 0, 0.25)
-
-    -- Inner bevel: bottom/right highlight (subtle light catch for dimension)
-    icon.highlightBottom = icon:CreateTexture(nil, "ARTWORK", nil, 3)
-    icon.highlightBottom:SetPoint("BOTTOMLEFT")
-    icon.highlightBottom:SetPoint("BOTTOMRIGHT")
-    icon.highlightBottom:SetHeight(1)
-    icon.highlightBottom:SetColorTexture(1, 1, 1, 0.10)
-
-    icon.highlightRight = icon:CreateTexture(nil, "ARTWORK", nil, 3)
-    icon.highlightRight:SetPoint("TOPRIGHT")
-    icon.highlightRight:SetPoint("BOTTOMRIGHT", 0, 1)
-    icon.highlightRight:SetWidth(1)
-    icon.highlightRight:SetColorTexture(1, 1, 1, 0.07)
 
     -- Cooldown sweep overlay
     icon.cooldown = CreateFrame("Cooldown", nil, icon, "CooldownFrameTemplate")
@@ -766,7 +932,6 @@ function addon:RefreshAllBars()
             if self.icons[guid] then
                 for _, icon in pairs(self.icons[guid]) do
                     icon:Hide()
-                    icon:SetParent(nil)
                 end
                 self.icons[guid] = nil
             end
@@ -784,7 +949,6 @@ function addon:ResetAllPositions()
     if not self.db then return end
     wipe(self.db.party.positions)
     wipe(self.db.enemy.positions)
-    self.db.party.anchorToFrames = true
     self:RefreshAllBars()
     self:Print("All bar positions reset to defaults.")
 end
@@ -793,13 +957,11 @@ function addon:DestroyBar(guid)
     local bar = self.bars[guid]
     if bar then
         bar:Hide()
-        bar:SetParent(nil)
         self.bars[guid] = nil
     end
     if self.icons[guid] then
         for _, icon in pairs(self.icons[guid]) do
             icon:Hide()
-            icon:SetParent(nil)
         end
         self.icons[guid] = nil
     end
@@ -838,8 +1000,44 @@ function addon:PlayUseFlash(icon)
 end
 
 ---------------------------------------------------------------------------
+-- Re-anchor (delayed, for party frame anchoring after roster/frame changes)
+---------------------------------------------------------------------------
+function addon:ScheduleReanchor()
+    if self._reanchorTimer then return end
+    self._reanchorTimer = C_Timer.After(0.5, function()
+        self._reanchorTimer = nil
+        if self.db and self.db.party.anchorToFrames then
+            for guid, info in pairs(self.state.trackedPlayers) do
+                if info.team == "party" then
+                    self:PositionBar(guid)
+                end
+            end
+        end
+    end)
+end
+
+---------------------------------------------------------------------------
 -- Init
 ---------------------------------------------------------------------------
 function addon:InitDisplay()
-    -- Display system ready
+    -- Hook party frame show/hide to reposition bars when frames appear/disappear
+    local function hookPartyFrame(frameName)
+        local frame = _G[frameName]
+        if frame then
+            hooksecurefunc(frame, "Show", function()
+                addon:ScheduleReanchor()
+            end)
+            hooksecurefunc(frame, "Hide", function()
+                addon:ScheduleReanchor()
+            end)
+        end
+    end
+
+    -- Hook Blizzard party frames (may not exist yet at load time, so pcall)
+    for i = 1, 4 do
+        pcall(hookPartyFrame, "PartyMemberFrame" .. i)
+    end
+    for i = 1, 5 do
+        pcall(hookPartyFrame, "CompactPartyFrameMember" .. i)
+    end
 end

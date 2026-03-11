@@ -333,13 +333,18 @@ function addon:ExportConfig()
     -- Party settings (exclude positions)
     exportData.party.enabled = db.party.enabled
     exportData.party.iconSize = db.party.iconSize
+    exportData.party.gridCols = db.party.gridCols
+    exportData.party.gridRows = db.party.gridRows
     exportData.party.anchorToFrames = db.party.anchorToFrames
-    exportData.party.offsetX = db.party.offsetX
-    exportData.party.offsetY = db.party.offsetY
+    exportData.party.anchorSide = db.party.anchorSide
+    exportData.party.anchorOffsetX = db.party.anchorOffsetX
+    exportData.party.anchorOffsetY = db.party.anchorOffsetY
 
     -- Enemy settings (exclude positions)
     exportData.enemy.enabled = db.enemy.enabled
     exportData.enemy.iconSize = db.enemy.iconSize
+    exportData.enemy.gridCols = db.enemy.gridCols
+    exportData.enemy.gridRows = db.enemy.gridRows
     exportData.enemy.anchorX = db.enemy.anchorX
     exportData.enemy.anchorY = db.enemy.anchorY
     exportData.enemy.spacing = db.enemy.spacing
@@ -383,6 +388,23 @@ end
 local function CopyNumSetting(src, dst, key)
     if src[key] ~= nil and type(src[key]) == "number" then
         dst[key] = src[key]
+    end
+end
+
+local function CopyStringSetting(src, dst, key)
+    if src[key] ~= nil and type(src[key]) == "string" then
+        dst[key] = src[key]
+    end
+end
+
+local function CopyTableSetting(src, dst, key, validator)
+    if src[key] ~= nil and type(src[key]) == "table" then
+        if not validator or validator(src[key]) then
+            dst[key] = {}
+            for k, v in pairs(src[key]) do
+                dst[key][k] = v
+            end
+        end
     end
 end
 
@@ -431,6 +453,7 @@ function addon:ImportConfig(encodedStr)
         CopyBoolSetting(data.general, self.db.general, "locked")
         CopyNumSetting(data.general, self.db.general, "iconSize")
         CopyBoolSetting(data.general, self.db.general, "compactMode")
+        CopyBoolSetting(data.general, self.db.general, "showIconBorders")
         CopyBoolSetting(data.general, self.db.general, "showGlowOnReady")
         CopyBoolSetting(data.general, self.db.general, "showFlashOnUse")
         CopyBoolSetting(data.general, self.db.general, "showPulseOnLow")
@@ -438,21 +461,29 @@ function addon:ImportConfig(encodedStr)
         CopyBoolSetting(data.general, self.db.general, "showSpellTooltips")
         CopyBoolSetting(data.general, self.db.general, "soundAlerts")
         CopyBoolSetting(data.general, self.db.general, "trackOutsideArena")
+        CopyTableSetting(data.general, self.db.general, "activeGlowColor", function(t)
+            return type(t.r) == "number" and type(t.g) == "number" and type(t.b) == "number"
+        end)
     end
 
     -- Validate and apply party settings
     if data.party and type(data.party) == "table" then
         CopyBoolSetting(data.party, self.db.party, "enabled")
         CopyNumSetting(data.party, self.db.party, "iconSize")
+        CopyNumSetting(data.party, self.db.party, "gridCols")
+        CopyNumSetting(data.party, self.db.party, "gridRows")
         CopyBoolSetting(data.party, self.db.party, "anchorToFrames")
-        CopyNumSetting(data.party, self.db.party, "offsetX")
-        CopyNumSetting(data.party, self.db.party, "offsetY")
+        CopyStringSetting(data.party, self.db.party, "anchorSide")
+        CopyNumSetting(data.party, self.db.party, "anchorOffsetX")
+        CopyNumSetting(data.party, self.db.party, "anchorOffsetY")
     end
 
     -- Validate and apply enemy settings
     if data.enemy and type(data.enemy) == "table" then
         CopyBoolSetting(data.enemy, self.db.enemy, "enabled")
         CopyNumSetting(data.enemy, self.db.enemy, "iconSize")
+        CopyNumSetting(data.enemy, self.db.enemy, "gridCols")
+        CopyNumSetting(data.enemy, self.db.enemy, "gridRows")
         CopyNumSetting(data.enemy, self.db.enemy, "anchorX")
         CopyNumSetting(data.enemy, self.db.enemy, "anchorY")
         CopyNumSetting(data.enemy, self.db.enemy, "spacing")

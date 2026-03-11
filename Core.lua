@@ -16,11 +16,10 @@ addon.FONT_DISPLAY = TrinketedLib.FONT_DISPLAY
 addon.FONT_BODY    = TrinketedLib.FONT_BODY
 addon.FONT_MONO    = TrinketedLib.FONT_MONO
 
-addon.ARENA_ZONES = {
-    ["Nagrand Arena"] = true,
-    ["Blade's Edge Arena"] = true,
-    ["Ruins of Lordaeron"] = true,
-}
+-- Detect arena instance via API instead of hardcoded zone names
+function addon:IsInArenaInstance()
+    return select(2, IsInInstance()) == "arena"
+end
 
 addon.CLASS_COLORS = {
     ["Warrior"]     = { r = 0.78, g = 0.61, b = 0.43, hex = "ffc79c6e" },
@@ -86,6 +85,10 @@ local DEFAULTS = {
         iconSize        = 36,
         gridCols        = 4,
         gridRows        = 3,
+        anchorToFrames  = false,
+        anchorSide      = "RIGHT",
+        anchorOffsetX   = 4,
+        anchorOffsetY   = 0,
         positions       = {},
     },
     enemy = {
@@ -214,9 +217,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
             addon:InitOptions()
 
             -- Detect if already in arena on reload
-            local zone = GetRealZoneText()
-            if addon.ARENA_ZONES[zone] then
+            if addon:IsInArenaInstance() then
                 addon.state.inArena = true
+                addon:ClearAllCooldowns()
                 addon:ScanPartyMembers()
                 addon:ScanArenaPlayers()
                 addon:RefreshAllBars()
@@ -227,10 +230,11 @@ frame:SetScript("OnEvent", function(self, event, ...)
         end
 
     elseif event == "ZONE_CHANGED_NEW_AREA" then
-        local zone = GetRealZoneText()
-        if addon.ARENA_ZONES[zone] then
+        if addon:IsInArenaInstance() then
             if not addon.state.inArena then
                 addon.state.inArena = true
+                -- Clear CDs from previous match on arena entry
+                addon:ClearAllCooldowns()
                 addon:ScanPartyMembers()
                 addon:ScanArenaPlayers()
                 addon:RefreshAllBars()
@@ -238,9 +242,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
         else
             if addon.state.inArena then
                 addon.state.inArena = false
-                addon:ClearAllCooldowns()
+                -- Don't clear cooldowns — let them persist for post-match review
                 addon:HideAllBars()
-                -- Clear non-test tracked players
+                -- Clear non-test tracked players and associated maps
                 local toRemove = {}
                 for guid in pairs(addon.state.trackedPlayers) do
                     if not tostring(guid):match("^test_") then
@@ -251,6 +255,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
                     addon.state.trackedPlayers[guid] = nil
                     addon.state.guidMap[guid] = nil
                 end
+                wipe(addon.state.unitMap)
+                wipe(addon.state.petOwnerMap)
             end
         end
 
@@ -264,6 +270,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
         if addon.state.inArena or addon.state.testMode or (addon.db and addon.db.general.trackOutsideArena) then
             addon:ScanPartyMembers()
             addon:RefreshAllBars()
+            addon:ScheduleReanchor()
         end
 
     elseif event == "ARENA_OPPONENT_UPDATE" then

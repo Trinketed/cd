@@ -76,7 +76,6 @@ local DEFAULTS = {
         showPulseOnLow  = true,
         showPlayerLabels = true,
         showSpellTooltips = false,
-        soundAlerts     = false,
         trackOutsideArena = false,
         activeGlowColor = { r = 0.3, g = 1.0, b = 0.3 },
     },
@@ -89,16 +88,6 @@ local DEFAULTS = {
         anchorSide      = "RIGHT",
         anchorOffsetX   = 4,
         anchorOffsetY   = 0,
-        positions       = {},
-    },
-    enemy = {
-        enabled         = true,
-        iconSize        = 36,
-        gridCols        = 4,
-        gridRows        = 3,
-        anchorX         = 500,
-        anchorY         = -200,
-        spacing         = 40,
         positions       = {},
     },
     cooldowns = {
@@ -196,7 +185,6 @@ frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 frame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 frame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
-frame:RegisterEvent("ARENA_OPPONENT_UPDATE")
 frame:RegisterEvent("GROUP_ROSTER_UPDATE")
 
 frame:SetScript("OnEvent", function(self, event, ...)
@@ -221,7 +209,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
                 addon.state.inArena = true
                 addon:ClearAllCooldowns()
                 addon:ScanPartyMembers()
-                addon:ScanArenaPlayers()
+                addon:ScanPetOwners()
                 addon:RefreshAllBars()
             end
 
@@ -236,7 +224,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
                 -- Clear CDs from previous match on arena entry
                 addon:ClearAllCooldowns()
                 addon:ScanPartyMembers()
-                addon:ScanArenaPlayers()
+                addon:ScanPetOwners()
                 addon:RefreshAllBars()
             end
         else
@@ -263,21 +251,16 @@ frame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "PLAYER_ENTERING_WORLD" then
         if addon.state.inArena or addon.state.testMode or (addon.db and addon.db.general.trackOutsideArena) then
             addon:ScanPartyMembers()
+            addon:ScanPetOwners()
             addon:RefreshAllBars()
         end
 
     elseif event == "GROUP_ROSTER_UPDATE" then
         if addon.state.inArena or addon.state.testMode or (addon.db and addon.db.general.trackOutsideArena) then
             addon:ScanPartyMembers()
-            addon:RefreshAllBars()
-            addon:ScheduleReanchor()
-        end
-
-    elseif event == "ARENA_OPPONENT_UPDATE" then
-        if addon.state.inArena then
-            addon:ScanArenaPlayers()
             addon:ScanPetOwners()
             addon:RefreshAllBars()
+            addon:ScheduleReanchor()
         end
 
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then

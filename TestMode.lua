@@ -13,11 +13,6 @@ local DEFAULT_TEST_PLAYERS = {
     { team = "party", class = "Priest",   race = "Dwarf",     slot = 2 },
     { team = "party", class = "Paladin",  race = "Human",     slot = 3 },
     { team = "party", class = "Druid",    race = "Night Elf", slot = 4 },
-    { team = "enemy", class = "Rogue",    race = "Undead",    slot = 1 },
-    { team = "enemy", class = "Mage",     race = "Blood Elf", slot = 2 },
-    { team = "enemy", class = "Druid",    race = "Tauren",    slot = 3 },
-    { team = "enemy", class = "Warlock",  race = "Orc",       slot = 4 },
-    { team = "enemy", class = "Warrior",  race = "Orc",       slot = 5 },
 }
 
 ---------------------------------------------------------------------------
@@ -109,11 +104,11 @@ function addon:CreateTestPlayers()
     end
 
     -- Team/slot is determined by index position, not saved data
-    local SLOT_TEAMS = { "party", "party", "party", "party", "enemy", "enemy", "enemy", "enemy", "enemy" }
-    local SLOT_NUMS  = { 1, 2, 3, 4, 1, 2, 3, 4, 5 }
+    local SLOT_TEAMS = { "party", "party", "party", "party" }
+    local SLOT_NUMS  = { 1, 2, 3, 4 }
 
     for i, tp in ipairs(testConfig) do
-        local team = SLOT_TEAMS[i] or "enemy"
+        local team = SLOT_TEAMS[i] or "party"
         local slot = SLOT_NUMS[i] or i
         local guid = "test_" .. i
 
@@ -124,12 +119,12 @@ function addon:CreateTestPlayers()
         end
 
         self.state.trackedPlayers[guid] = {
-            name      = (team == "party" and "Party " or "Arena ") .. slot,
+            name      = "Party " .. slot,
             class     = tp.class,
             race      = tp.race,
             team      = team,
             slot      = slot,
-            unit      = (team == "party" and "party" or "arena") .. slot,
+            unit      = "party" .. slot,
             cooldowns = {},
         }
         self.state.guidMap[guid] = guid
@@ -227,8 +222,8 @@ end
 function addon:UpdateTestSlot(slotIndex, className, raceName)
     if not self.db then return end
 
-    local teams = { "party", "party", "party", "party", "enemy", "enemy", "enemy", "enemy", "enemy" }
-    local slots = { 1, 2, 3, 4, 1, 2, 3, 4, 5 }
+    local teams = { "party", "party", "party", "party" }
+    local slots = { 1, 2, 3, 4 }
 
     self.db.testMode.lastPlayers[slotIndex] = {
         team  = teams[slotIndex],

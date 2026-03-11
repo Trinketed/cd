@@ -79,71 +79,6 @@ function addon:ScanPartyMembers()
     end
 end
 
-function addon:ScanArenaPlayers()
-    if addon.state.testMode then return end
-
-    -- Build new set of arena enemies
-    local newGUIDs = {}
-    for i = 1, 5 do
-        local unit = "arena" .. i
-        if UnitExists(unit) then
-            local guid = UnitGUID(unit)
-            if guid then newGUIDs[guid] = { unit = unit, slot = i } end
-        end
-    end
-
-    -- Remove old enemy entries no longer present (preserve test players)
-    local toRemove = {}
-    for guid, info in pairs(self.state.trackedPlayers) do
-        if info.team == "enemy" and not tostring(guid):match("^test_") and not newGUIDs[guid] then
-            toRemove[#toRemove + 1] = guid
-        end
-    end
-    for _, guid in ipairs(toRemove) do
-        self.state.trackedPlayers[guid] = nil
-        self.state.guidMap[guid] = nil
-    end
-    for i = 1, 5 do
-        self.state.unitMap["arena" .. i] = nil
-    end
-
-    -- Add or update arena enemies, preserving cooldowns/spec for existing entries
-    for i = 1, 5 do
-        local unit = "arena" .. i
-        if UnitExists(unit) then
-            local guid = UnitGUID(unit)
-            local name = self:StripRealm(UnitName(unit))
-            local _, className = UnitClass(unit)
-            local race = UnitRace(unit)
-            if guid and name and className then
-                local formatted = self:FormatClassName(className)
-                local existing = self.state.trackedPlayers[guid]
-                if existing and existing.team == "enemy" then
-                    -- Preserve cooldowns and spec, update unit/slot/name
-                    existing.unit = unit
-                    existing.slot = i
-                    existing.name = name
-                    existing.race = race
-                    self:Debug("Enemy updated: " .. name .. " (" .. formatted .. ") slot " .. i)
-                else
-                    self.state.trackedPlayers[guid] = {
-                        name      = name,
-                        class     = formatted,
-                        race      = race,
-                        team      = "enemy",
-                        slot      = i,
-                        unit      = unit,
-                        cooldowns = {},
-                    }
-                    self:Debug("Enemy scanned: " .. name .. " (" .. formatted .. ") slot " .. i)
-                end
-                self.state.guidMap[guid] = guid
-                self.state.unitMap[unit] = guid
-            end
-        end
-    end
-end
-
 -- Map pet GUIDs to their owner GUIDs for pet ability tracking
 function addon:ScanPetOwners()
     wipe(self.state.petOwnerMap)
@@ -161,51 +96,11 @@ function addon:ScanPetOwners()
         end
     end
 
-    -- Arena enemy pets
-    for i = 1, 5 do
-        local petUnit = "arenapet" .. i
-        local ownerUnit = "arena" .. i
-        if UnitExists(petUnit) and UnitExists(ownerUnit) then
-            local petGUID = UnitGUID(petUnit)
-            local ownerGUID = UnitGUID(ownerUnit)
-            if petGUID and ownerGUID then
-                self.state.petOwnerMap[petGUID] = ownerGUID
-            end
-        end
-    end
 end
 
--- Try to discover an unknown GUID by checking arena/party units
+-- Try to discover an unknown GUID by checking party units
 function addon:TryDiscoverPlayer(guid)
     if not guid or self.state.guidMap[guid] then return end
-
-    -- Check arena units
-    for i = 1, 5 do
-        local unit = "arena" .. i
-        if UnitExists(unit) and UnitGUID(unit) == guid then
-            local name = self:StripRealm(UnitName(unit))
-            local _, className = UnitClass(unit)
-            local race = UnitRace(unit)
-            if name and className then
-                local formatted = self:FormatClassName(className)
-                self.state.trackedPlayers[guid] = {
-                    name      = name,
-                    class     = formatted,
-                    race      = race,
-                    team      = "enemy",
-                    slot      = i,
-                    unit      = unit,
-                    cooldowns = {},
-                }
-                self.state.guidMap[guid] = guid
-                self.state.unitMap[unit] = guid
-                self:Debug("Discovered enemy: " .. name .. " (" .. formatted .. ")")
-                self:CreateBar(guid)
-                self:UpdatePlayerBar(guid)
-            end
-            return
-        end
-    end
 
     -- Check party units
     for i = 1, 4 do
@@ -387,9 +282,8 @@ function addon:GenerateDefaultGrid(className, team)
     end
 
     -- Use fixed team grid dimensions
-    local teamSettings = (team == "party") and self.db.party or self.db.enemy
-    local gridCols = teamSettings.gridCols or 4
-    local gridRows = teamSettings.gridRows or 3
+    local gridCols = self.db.party.gridCols or 4
+    local gridRows = self.db.party.gridRows or 3
 
     -- Pad slots to fill rows * cols (overflow spells stay in pool)
     local total = gridRows * gridCols
@@ -480,9 +374,8 @@ function addon:GetClassGrid(className, team)
     end
     -- Enforce fixed team grid dimensions
     if grid then
-        local teamSettings = (team == "party") and self.db.party or self.db.enemy
-        local teamCols = teamSettings.gridCols or 4
-        local teamRows = teamSettings.gridRows or 3
+        local teamCols = self.db.party.gridCols or 4
+        local teamRows = self.db.party.gridRows or 3
         if grid.cols ~= teamCols or grid.rows ~= teamRows then
             self:ResizeGrid(grid, teamRows, teamCols)
         end
@@ -672,13 +565,6 @@ function addon:OnCooldownExpired(guid, spellName, cdInfo)
         end
     end
 
-    -- Sound alert (only for enemy cooldowns)
-    if self.db.general.soundAlerts and playerInfo.team == "enemy" then
-        local cat = cdInfo.category
-        if cat == "trinket" or cat == "major_defensive" or cat == "major_offensive" then
-            PlaySoundFile("Sound\\Interface\\RaidWarning.ogg", "Master")
-        end
-    end
 end
 
 ---------------------------------------------------------------------------

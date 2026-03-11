@@ -57,11 +57,7 @@ function addon:CreateBar(guid)
     bar.teamIndicator:SetHeight(2)
     bar.teamIndicator:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", 0, -1)
     bar.teamIndicator:SetPoint("TOPRIGHT", bar, "BOTTOMRIGHT", 0, -1)
-    if info.team == "party" then
-        bar.teamIndicator:SetColorTexture(C.partyBlue[1], C.partyBlue[2], C.partyBlue[3], 0.8)
-    else
-        bar.teamIndicator:SetColorTexture(C.enemyRed[1], C.enemyRed[2], C.enemyRed[3], 0.8)
-    end
+    bar.teamIndicator:SetColorTexture(C.partyBlue[1], C.partyBlue[2], C.partyBlue[3], 0.8)
     bar.teamIndicator:Hide()
 
     bar.guid = guid
@@ -296,16 +292,6 @@ function addon:PositionBar(guid)
             bar:SetPoint("TOPLEFT", UIParent, "TOPLEFT",
                 20, -(200 + (info.slot - 1) * 50))
         end
-    elseif info.team == "enemy" then
-        local settings = self.db.enemy
-        local saved = settings.positions[tostring(info.slot)]
-        if saved then
-            bar:SetPoint(saved.point, UIParent, saved.relPoint, saved.x, saved.y)
-        else
-            bar:SetPoint("TOPLEFT", UIParent, "TOPLEFT",
-                settings.anchorX,
-                settings.anchorY - (info.slot - 1) * settings.spacing)
-        end
     end
 end
 
@@ -318,8 +304,7 @@ function addon:SaveBarPosition(guid)
     if info.team == "party" and self.db.party.anchorToFrames then return end
 
     local point, _, relPoint, x, y = bar:GetPoint()
-    local settings = (info.team == "party") and self.db.party or self.db.enemy
-    settings.positions[tostring(info.slot)] = {
+    self.db.party.positions[tostring(info.slot)] = {
         point = point, relPoint = relPoint, x = x, y = y,
     }
 end
@@ -332,8 +317,7 @@ function addon:CreateCooldownIcon(bar, guid, spellName)
     if not cdData then return end
 
     local info = self.state.trackedPlayers[guid]
-    local teamSettings = info and ((info.team == "party") and self.db.party or self.db.enemy)
-    local size = teamSettings and teamSettings.iconSize or self.db.general.iconSize
+    local size = info and self.db.party.iconSize or self.db.general.iconSize
 
     local icon = CreateFrame("Frame", nil, bar)
     icon:SetSize(size, size)
@@ -349,10 +333,7 @@ function addon:CreateCooldownIcon(bar, guid, spellName)
     icon.texture:SetAllPoints()
     local texturePath
     if cdData.allianceIcon and cdData.hordeIcon then
-        local playerInfo = self.state.trackedPlayers[guid]
-        local isAlly = not playerInfo or playerInfo.team == "party"
-        local playerIsAlliance = (self.playerFaction == "Alliance")
-        if (isAlly and playerIsAlliance) or (not isAlly and not playerIsAlliance) then
+        if self.playerFaction == "Alliance" then
             texturePath = cdData.allianceIcon
         else
             texturePath = cdData.hordeIcon
@@ -624,7 +605,7 @@ function addon:UpdatePlayerBar(guid)
     local info = self.state.trackedPlayers[guid]
     if not bar or not info then return end
 
-    local settings = (info.team == "party") and self.db.party or self.db.enemy
+    local settings = self.db.party
     if not settings.enabled then
         bar:Hide()
         return
@@ -948,7 +929,6 @@ end
 function addon:ResetAllPositions()
     if not self.db then return end
     wipe(self.db.party.positions)
-    wipe(self.db.enemy.positions)
     self:RefreshAllBars()
     self:Print("All bar positions reset to defaults.")
 end

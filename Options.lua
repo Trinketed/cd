@@ -14,7 +14,6 @@ local sidebarButtons = {}
 -- Per-team grid builder state
 local gridBuilderState = {
     party = { currentClass = "Warrior", gridSlotPool = {}, poolRowPool = {}, scrollChild = nil, gridParent = nil, filterButtons = {}, searchText = "" },
-    enemy = { currentClass = "Warrior", gridSlotPool = {}, poolRowPool = {}, scrollChild = nil, gridParent = nil, filterButtons = {}, searchText = "" },
 }
 
 ---------------------------------------------------------------------------
@@ -81,7 +80,7 @@ function addon:BuildOptionsContent(parent)
     innerContent:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
 
     -- Build internal tab buttons
-    local tabNames = { "General", "Party", "Enemy", "Test" }
+    local tabNames = { "General", "Party", "Test" }
     local TAB_H = 30
     local TAB_START_Y = -36
 
@@ -142,8 +141,7 @@ function addon:BuildOptionsContent(parent)
     -- Populate tab contents
     self:PopulateGeneralTab(contentFrames[1])
     self:PopulatePartyTab(contentFrames[2])
-    self:PopulateEnemyTab(contentFrames[3])
-    self:PopulateTestModeTab(contentFrames[4])
+    self:PopulateTestModeTab(contentFrames[3])
 
     -- Select first tab
     SelectTab(1)
@@ -348,16 +346,6 @@ function addon:PopulateGeneralTab(parent)
             self.db.general.compactMode = checked
             self:RefreshAllBars()
         end)
-    lib:CreateCheckbox(parent, col2, y, "Sound alert (enemy CDs)",
-        self.db.general.soundAlerts, function(checked)
-            self.db.general.soundAlerts = checked
-        end)
-    y = y - 24
-
-    lib:CreateCheckbox(parent, col1, y, "Show spell tooltips on hover",
-        self.db.general.showSpellTooltips, function(checked)
-            self.db.general.showSpellTooltips = checked
-        end)
     lib:CreateCheckbox(parent, col2, y, "Show category borders",
         self.db.general.showIconBorders, function(checked)
             self.db.general.showIconBorders = checked
@@ -365,11 +353,16 @@ function addon:PopulateGeneralTab(parent)
         end)
     y = y - 24
 
-    lib:CreateCheckbox(parent, col1, y, "Track outside arena",
+    lib:CreateCheckbox(parent, col1, y, "Show spell tooltips on hover",
+        self.db.general.showSpellTooltips, function(checked)
+            self.db.general.showSpellTooltips = checked
+        end)
+    lib:CreateCheckbox(parent, col2, y, "Track outside arena",
         self.db.general.trackOutsideArena, function(checked)
             self.db.general.trackOutsideArena = checked
             if checked and not addon.state.inArena then
                 addon:ScanPartyMembers()
+                addon:ScanPetOwners()
                 addon:RefreshAllBars()
             end
         end)
@@ -1654,65 +1647,6 @@ function addon:PopulatePartyTab(parent)
 end
 
 ---------------------------------------------------------------------------
--- Enemy Tab (Settings / Spells inner tabs)
----------------------------------------------------------------------------
-function addon:PopulateEnemyTab(parent)
-    local subContents = CreateInnerTabs(parent, { "Settings", "Spells" })
-
-    -- Settings sub-tab
-    local sp = subContents[1]
-    local y = -10
-
-    y = lib:CreateSectionHeader(sp, y, "ENEMY COOLDOWN BARS")
-    y = y - 4
-
-    lib:CreateCheckbox(sp, 10, y, "Enable enemy cooldown tracking",
-        self.db.enemy.enabled, function(checked)
-            self.db.enemy.enabled = checked
-            self:RefreshAllBars()
-        end)
-    y = y - 32
-
-    lib:CreateSlider(sp, 10, y, "Icon Size", 16, 48, 2,
-        self.db.enemy.iconSize, function(val)
-            self.db.enemy.iconSize = val
-            self:RefreshAllBars()
-        end)
-    y = y - 48
-
-    y = lib:CreateSectionHeader(sp, y, "POSITIONING")
-    y = y - 2
-
-    local dragHint = sp:CreateFontString(nil, "OVERLAY")
-    dragHint:SetFont(addon.FONT_BODY, 10, "")
-    dragHint:SetPoint("TOPLEFT", 10, y)
-    dragHint:SetWidth(520)
-    dragHint:SetJustifyH("LEFT")
-    dragHint:SetText("Unlock bars, then drag them to reposition. Lock when done.")
-    dragHint:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
-    y = y - 22
-
-    lib:CreateButton(sp, 10, y, 180, "Reset Enemy Positions", function()
-        wipe(self.db.enemy.positions)
-        self:RefreshAllBars()
-        self:Print("Enemy bar positions reset.")
-    end)
-    y = y - 38
-
-    y = lib:CreateSectionHeader(sp, y, "IMPORT / EXPORT")
-    y = y - 4
-    lib:CreateButton(sp, 10, y, 140, "Export Config", function()
-        addon:ShowImportExportDialog("export")
-    end)
-    lib:CreateButton(sp, 160, y, 140, "Import Config", function()
-        addon:ShowImportExportDialog("import")
-    end)
-
-    -- Spells sub-tab (Grid Builder)
-    PopulateGridBuilder(subContents[2], "enemy", gridBuilderState.enemy)
-end
-
----------------------------------------------------------------------------
 -- Test Mode Tab
 ---------------------------------------------------------------------------
 function addon:PopulateTestModeTab(parent)
@@ -1747,40 +1681,24 @@ function addon:PopulateTestModeTab(parent)
     end)
     y = y - 38
 
-    -- Side-by-side layout: Party (left) | Enemy (right)
-    local leftX = 10
-    local rightX = 280
-
+    -- Party player slots
     local partyLabel = parent:CreateFontString(nil, "OVERLAY")
     partyLabel:SetFont(addon.FONT_BODY, 11, "")
-    partyLabel:SetPoint("TOPLEFT", leftX, y)
+    partyLabel:SetPoint("TOPLEFT", 10, y)
     partyLabel:SetText("Party Players")
     partyLabel:SetTextColor(C.partyBlue[1], C.partyBlue[2], C.partyBlue[3])
 
     local partyLine = parent:CreateTexture(nil, "ARTWORK")
-    partyLine:SetPoint("TOPLEFT", leftX, y - 14)
-    partyLine:SetSize(240, 1)
+    partyLine:SetPoint("TOPLEFT", 10, y - 14)
+    partyLine:SetSize(480, 1)
     partyLine:SetColorTexture(C.partyBlue[1], C.partyBlue[2], C.partyBlue[3], 0.25)
 
-    local enemyLabel = parent:CreateFontString(nil, "OVERLAY")
-    enemyLabel:SetFont(addon.FONT_BODY, 11, "")
-    enemyLabel:SetPoint("TOPLEFT", rightX, y)
-    enemyLabel:SetText("Enemy Players")
-    enemyLabel:SetTextColor(C.enemyRed[1], C.enemyRed[2], C.enemyRed[3])
-
-    local enemyLine = parent:CreateTexture(nil, "ARTWORK")
-    enemyLine:SetPoint("TOPLEFT", rightX, y - 14)
-    enemyLine:SetSize(240, 1)
-    enemyLine:SetColorTexture(C.enemyRed[1], C.enemyRed[2], C.enemyRed[3], 0.25)
-
     y = y - 22
-    local slotsStartY = y
 
-    -- Party slots (4)
     for i = 1, 4 do
         local slotLabel = parent:CreateFontString(nil, "OVERLAY")
         slotLabel:SetFont(addon.FONT_BODY, 10, "")
-        slotLabel:SetPoint("TOPLEFT", leftX, y)
+        slotLabel:SetPoint("TOPLEFT", 10, y)
         slotLabel:SetText(i .. ".")
         slotLabel:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
 
@@ -1794,7 +1712,7 @@ function addon:PopulateTestModeTab(parent)
 
         local classDDName = "TrinketedCDTestClassDD_" .. i
         local classDD = CreateFrame("Frame", classDDName, parent, "UIDropDownMenuTemplate")
-        classDD:SetPoint("TOPLEFT", leftX + 6, y + 5)
+        classDD:SetPoint("TOPLEFT", 16, y + 5)
         UIDropDownMenu_SetWidth(classDD, 95)
         UIDropDownMenu_Initialize(classDD, function(self2, level)
             for _, class in ipairs(addon.ALL_CLASSES) do
@@ -1819,7 +1737,7 @@ function addon:PopulateTestModeTab(parent)
 
         local raceDDName = "TrinketedCDTestRaceDD_" .. i
         local raceDD = CreateFrame("Frame", raceDDName, parent, "UIDropDownMenuTemplate")
-        raceDD:SetPoint("TOPLEFT", leftX + 140, y + 5)
+        raceDD:SetPoint("TOPLEFT", 150, y + 5)
         UIDropDownMenu_SetWidth(raceDD, 75)
         UIDropDownMenu_Initialize(raceDD, function(self2, level)
             for _, race in ipairs(addon.ALL_RACES) do
@@ -1837,70 +1755,5 @@ function addon:PopulateTestModeTab(parent)
         UIDropDownMenu_SetText(raceDD, currentRace)
 
         y = y - 28
-    end
-
-    local enemyY = slotsStartY
-
-    -- Enemy slots (5)
-    for i = 1, 5 do
-        local slotLabel = parent:CreateFontString(nil, "OVERLAY")
-        slotLabel:SetFont(addon.FONT_BODY, 10, "")
-        slotLabel:SetPoint("TOPLEFT", rightX, enemyY)
-        slotLabel:SetText(i .. ".")
-        slotLabel:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
-
-        local slotIndex = i + 4
-        local currentClass = "Rogue"
-        local currentRace = "Undead"
-        if self.db and self.db.testMode.lastPlayers and self.db.testMode.lastPlayers[slotIndex] then
-            currentClass = self.db.testMode.lastPlayers[slotIndex].class or "Rogue"
-            currentRace = self.db.testMode.lastPlayers[slotIndex].race or "Undead"
-        end
-
-        local classDDName = "TrinketedCDTestClassDD_" .. (i + 4)
-        local classDD = CreateFrame("Frame", classDDName, parent, "UIDropDownMenuTemplate")
-        classDD:SetPoint("TOPLEFT", rightX + 6, enemyY + 5)
-        UIDropDownMenu_SetWidth(classDD, 95)
-        UIDropDownMenu_Initialize(classDD, function(self2, level)
-            for _, class in ipairs(addon.ALL_CLASSES) do
-                local info = UIDropDownMenu_CreateInfo()
-                local cc2 = addon.CLASS_COLORS[class]
-                if cc2 then
-                    info.text = "|c" .. cc2.hex .. class .. "|r"
-                else
-                    info.text = class
-                end
-                info.func = function()
-                    UIDropDownMenu_SetText(classDD, "|c" .. (cc2 and cc2.hex or "ffffffff") .. class .. "|r")
-                    addon:UpdateTestSlot(slotIndex, class, currentRace)
-                    currentClass = class
-                    CloseDropDownMenus()
-                end
-                UIDropDownMenu_AddButton(info, level)
-            end
-        end)
-        local cc2 = addon.CLASS_COLORS[currentClass]
-        UIDropDownMenu_SetText(classDD, "|c" .. (cc2 and cc2.hex or "ffffffff") .. currentClass .. "|r")
-
-        local raceDDName = "TrinketedCDTestRaceDD_" .. (i + 4)
-        local raceDD = CreateFrame("Frame", raceDDName, parent, "UIDropDownMenuTemplate")
-        raceDD:SetPoint("TOPLEFT", rightX + 140, enemyY + 5)
-        UIDropDownMenu_SetWidth(raceDD, 75)
-        UIDropDownMenu_Initialize(raceDD, function(self2, level)
-            for _, race in ipairs(addon.ALL_RACES) do
-                local info2 = UIDropDownMenu_CreateInfo()
-                info2.text = race
-                info2.func = function()
-                    UIDropDownMenu_SetText(raceDD, race)
-                    addon:UpdateTestSlot(slotIndex, currentClass, race)
-                    currentRace = race
-                    CloseDropDownMenus()
-                end
-                UIDropDownMenu_AddButton(info2, level)
-            end
-        end)
-        UIDropDownMenu_SetText(raceDD, currentRace)
-
-        enemyY = enemyY - 28
     end
 end

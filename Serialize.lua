@@ -321,7 +321,6 @@ function addon:ExportConfig()
         v = FORMAT_VERSION,
         general = {},
         party = {},
-        enemy = {},
         grids = {},
     }
 
@@ -339,15 +338,6 @@ function addon:ExportConfig()
     exportData.party.anchorSide = db.party.anchorSide
     exportData.party.anchorOffsetX = db.party.anchorOffsetX
     exportData.party.anchorOffsetY = db.party.anchorOffsetY
-
-    -- Enemy settings (exclude positions)
-    exportData.enemy.enabled = db.enemy.enabled
-    exportData.enemy.iconSize = db.enemy.iconSize
-    exportData.enemy.gridCols = db.enemy.gridCols
-    exportData.enemy.gridRows = db.enemy.gridRows
-    exportData.enemy.anchorX = db.enemy.anchorX
-    exportData.enemy.anchorY = db.enemy.anchorY
-    exportData.enemy.spacing = db.enemy.spacing
 
     -- Grids (deep copy)
     for className, teams in pairs(db.cooldowns.grids) do
@@ -459,7 +449,6 @@ function addon:ImportConfig(encodedStr)
         CopyBoolSetting(data.general, self.db.general, "showPulseOnLow")
         CopyBoolSetting(data.general, self.db.general, "showPlayerLabels")
         CopyBoolSetting(data.general, self.db.general, "showSpellTooltips")
-        CopyBoolSetting(data.general, self.db.general, "soundAlerts")
         CopyBoolSetting(data.general, self.db.general, "trackOutsideArena")
         CopyTableSetting(data.general, self.db.general, "activeGlowColor", function(t)
             return type(t.r) == "number" and type(t.g) == "number" and type(t.b) == "number"
@@ -478,17 +467,6 @@ function addon:ImportConfig(encodedStr)
         CopyNumSetting(data.party, self.db.party, "anchorOffsetY")
     end
 
-    -- Validate and apply enemy settings
-    if data.enemy and type(data.enemy) == "table" then
-        CopyBoolSetting(data.enemy, self.db.enemy, "enabled")
-        CopyNumSetting(data.enemy, self.db.enemy, "iconSize")
-        CopyNumSetting(data.enemy, self.db.enemy, "gridCols")
-        CopyNumSetting(data.enemy, self.db.enemy, "gridRows")
-        CopyNumSetting(data.enemy, self.db.enemy, "anchorX")
-        CopyNumSetting(data.enemy, self.db.enemy, "anchorY")
-        CopyNumSetting(data.enemy, self.db.enemy, "spacing")
-    end
-
     -- Validate and apply grids
     if data.grids and type(data.grids) == "table" then
         -- Build class lookup
@@ -505,7 +483,7 @@ function addon:ImportConfig(encodedStr)
                     self.db.cooldowns.grids[className] = {}
                 end
                 for team, grid in pairs(teams) do
-                    if team == "party" or team == "enemy" then
+                    if team == "party" then
                         if type(grid) == "table" and type(grid.rows) == "number" and type(grid.cols) == "number" and type(grid.slots) == "table" then
                             -- Validate spell names in slots
                             local cleanSlots = {}

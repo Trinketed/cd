@@ -159,7 +159,7 @@ function addon:ShowImportExportDialog(mode)
         local f = CreateFrame("Frame", "TrinketedCDImportExportDialog", UIParent, "BackdropTemplate")
         f:SetSize(480, 320)
         f:SetPoint("CENTER")
-        f:SetFrameStrata("DIALOG")
+        f:SetFrameStrata("FULLSCREEN_DIALOG")
         f:SetMovable(true)
         f:EnableMouse(true)
         f:RegisterForDrag("LeftButton")
@@ -1580,6 +1580,47 @@ function addon:PopulatePartyTab(parent)
         end)
     y = y - 42
 
+    y = lib:CreateSectionHeader(sp, y, "PARTY FRAME ANCHORING")
+    y = y - 4
+
+    lib:CreateCheckbox(sp, 10, y, "Anchor to party unit frames",
+        self.db.party.anchorToFrames, function(checked)
+            self.db.party.anchorToFrames = checked
+            self:RefreshAllBars()
+        end)
+    y = y - 32
+
+    -- Anchor side buttons (LEFT / RIGHT)
+    local sideLabel = sp:CreateFontString(nil, "OVERLAY")
+    sideLabel:SetFont(addon.FONT_BODY, 10, "")
+    sideLabel:SetPoint("TOPLEFT", 10, y)
+    sideLabel:SetText("Anchor Side:")
+    sideLabel:SetTextColor(C.textNormal[1], C.textNormal[2], C.textNormal[3])
+
+    local leftBtn = lib:CreateButton(sp, 100, y, 60, "Left", function()
+        self.db.party.anchorSide = "LEFT"
+        self:RefreshAllBars()
+    end)
+    lib:CreateButton(sp, 166, y, 60, "Right", function()
+        self.db.party.anchorSide = "RIGHT"
+        self:RefreshAllBars()
+    end)
+    y = y - 32
+
+    lib:CreateSlider(sp, 10, y, "Anchor Offset X", -50, 50, 1,
+        self.db.party.anchorOffsetX, function(val)
+            self.db.party.anchorOffsetX = val
+            self:RefreshAllBars()
+        end)
+    y = y - 42
+
+    lib:CreateSlider(sp, 10, y, "Anchor Offset Y", -50, 50, 1,
+        self.db.party.anchorOffsetY, function(val)
+            self.db.party.anchorOffsetY = val
+            self:RefreshAllBars()
+        end)
+    y = y - 48
+
     y = lib:CreateSectionHeader(sp, y, "POSITIONING")
     y = y - 2
 
@@ -1588,7 +1629,7 @@ function addon:PopulatePartyTab(parent)
     dragHint:SetPoint("TOPLEFT", 10, y)
     dragHint:SetWidth(520)
     dragHint:SetJustifyH("LEFT")
-    dragHint:SetText("Unlock bars, then drag them to reposition. Lock when done.")
+    dragHint:SetText("Unlock bars, then drag them to reposition. Lock when done. (Used when anchoring is off.)")
     dragHint:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
     y = y - 22
 

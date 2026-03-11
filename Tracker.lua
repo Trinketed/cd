@@ -11,11 +11,24 @@ local addon = TrinketedCD
 function addon:ScanPartyMembers()
     if addon.state.testMode then return end
 
-    -- Clear old party entries (preserve test players)
-    -- Collect first to avoid mutating table during pairs()
+    -- Hide in raids (any size) unless we're in an arena instance
+    local inArenaInstance = (select(2, IsInInstance()) == "arena")
+    if IsInRaid() and not inArenaInstance then return end
+
+    -- Build new set of party members, preserving existing state
+    local newGUIDs = {}
+    for i = 1, 4 do
+        local unit = "party" .. i
+        if UnitExists(unit) then
+            local guid = UnitGUID(unit)
+            if guid then newGUIDs[guid] = { unit = unit, slot = i } end
+        end
+    end
+
+    -- Remove old party entries that are no longer in the group (preserve test players)
     local toRemove = {}
     for guid, info in pairs(self.state.trackedPlayers) do
-        if info.team == "party" and not tostring(guid):match("^test_") then
+        if info.team == "party" and not tostring(guid):match("^test_") and not newGUIDs[guid] then
             toRemove[#toRemove + 1] = guid
         end
     end
@@ -23,14 +36,13 @@ function addon:ScanPartyMembers()
         self.state.trackedPlayers[guid] = nil
         self.state.guidMap[guid] = nil
     end
-    -- Clear party unit mappings
+
+    -- Clear party unit mappings (will be re-set below)
     for i = 1, 4 do
         self.state.unitMap["party" .. i] = nil
     end
 
-    -- Hide in raids with more than 6 players, but allow small raid groups for arena
-    if IsInRaid() and GetNumGroupMembers() > 6 then return end
-
+    -- Add or update party members, preserving cooldowns/spec for existing entries
     for i = 1, 4 do
         local unit = "party" .. i
         if UnitExists(unit) then
@@ -40,18 +52,28 @@ function addon:ScanPartyMembers()
             local race = UnitRace(unit)
             if guid and name and className then
                 local formatted = self:FormatClassName(className)
-                self.state.trackedPlayers[guid] = {
-                    name      = name,
-                    class     = formatted,
-                    race      = race,
-                    team      = "party",
-                    slot      = i,
-                    unit      = unit,
-                    cooldowns = {},
-                }
+                local existing = self.state.trackedPlayers[guid]
+                if existing and existing.team == "party" then
+                    -- Preserve cooldowns and spec, update unit/slot/name
+                    existing.unit = unit
+                    existing.slot = i
+                    existing.name = name
+                    existing.race = race
+                    self:Debug("Party updated: " .. name .. " (" .. formatted .. ") slot " .. i)
+                else
+                    self.state.trackedPlayers[guid] = {
+                        name      = name,
+                        class     = formatted,
+                        race      = race,
+                        team      = "party",
+                        slot      = i,
+                        unit      = unit,
+                        cooldowns = {},
+                    }
+                    self:Debug("Party scanned: " .. name .. " (" .. formatted .. ") slot " .. i)
+                end
                 self.state.guidMap[guid] = guid
                 self.state.unitMap[unit] = guid
-                self:Debug("Party scanned: " .. name .. " (" .. formatted .. ") slot " .. i)
             end
         end
     end
@@ -60,10 +82,20 @@ end
 function addon:ScanArenaPlayers()
     if addon.state.testMode then return end
 
-    -- Clear old enemy entries (preserve test players)
+    -- Build new set of arena enemies
+    local newGUIDs = {}
+    for i = 1, 5 do
+        local unit = "arena" .. i
+        if UnitExists(unit) then
+            local guid = UnitGUID(unit)
+            if guid then newGUIDs[guid] = { unit = unit, slot = i } end
+        end
+    end
+
+    -- Remove old enemy entries no longer present (preserve test players)
     local toRemove = {}
     for guid, info in pairs(self.state.trackedPlayers) do
-        if info.team == "enemy" and not tostring(guid):match("^test_") then
+        if info.team == "enemy" and not tostring(guid):match("^test_") and not newGUIDs[guid] then
             toRemove[#toRemove + 1] = guid
         end
     end
@@ -75,6 +107,7 @@ function addon:ScanArenaPlayers()
         self.state.unitMap["arena" .. i] = nil
     end
 
+    -- Add or update arena enemies, preserving cooldowns/spec for existing entries
     for i = 1, 5 do
         local unit = "arena" .. i
         if UnitExists(unit) then
@@ -84,18 +117,28 @@ function addon:ScanArenaPlayers()
             local race = UnitRace(unit)
             if guid and name and className then
                 local formatted = self:FormatClassName(className)
-                self.state.trackedPlayers[guid] = {
-                    name      = name,
-                    class     = formatted,
-                    race      = race,
-                    team      = "enemy",
-                    slot      = i,
-                    unit      = unit,
-                    cooldowns = {},
-                }
+                local existing = self.state.trackedPlayers[guid]
+                if existing and existing.team == "enemy" then
+                    -- Preserve cooldowns and spec, update unit/slot/name
+                    existing.unit = unit
+                    existing.slot = i
+                    existing.name = name
+                    existing.race = race
+                    self:Debug("Enemy updated: " .. name .. " (" .. formatted .. ") slot " .. i)
+                else
+                    self.state.trackedPlayers[guid] = {
+                        name      = name,
+                        class     = formatted,
+                        race      = race,
+                        team      = "enemy",
+                        slot      = i,
+                        unit      = unit,
+                        cooldowns = {},
+                    }
+                    self:Debug("Enemy scanned: " .. name .. " (" .. formatted .. ") slot " .. i)
+                end
                 self.state.guidMap[guid] = guid
                 self.state.unitMap[unit] = guid
-                self:Debug("Enemy scanned: " .. name .. " (" .. formatted .. ") slot " .. i)
             end
         end
     end
@@ -572,21 +615,25 @@ function addon:StartCooldown(guid, spellName, cdData)
     self:Debug("CD started: " .. playerInfo.name .. " - " .. spellName .. " (" .. duration .. "s)")
 
     -- Handle shared cooldowns (e.g., Human racial shares CD with PvP Trinket)
-    if cdData.sharedCD then
-        local sharedData = self.COOLDOWN_DB[cdData.sharedCD]
-        if sharedData and self:IsSpellEnabled(cdData.sharedCD, playerInfo.team, playerInfo.class) then
-            local sharedDur = cdData.sharedCDDuration or cdData.duration
-            -- Only apply shared CD if it would be longer than current remaining
-            local existing = playerInfo.cooldowns[cdData.sharedCD]
-            if not existing or (now + sharedDur) > existing.expirationTime then
-                playerInfo.cooldowns[cdData.sharedCD] = {
-                    startTime      = now,
-                    duration       = sharedDur,
-                    expirationTime = now + sharedDur,
-                    spellID        = sharedData.spellID,
-                    category       = sharedData.category,
-                }
-                self:Debug("  Shared CD: " .. cdData.sharedCD .. " (" .. sharedDur .. "s)")
+    local sharedList = cdData.sharedCD
+    if sharedList then
+        if type(sharedList) == "string" then sharedList = { sharedList } end
+        for _, sharedName in ipairs(sharedList) do
+            local sharedData = self.COOLDOWN_DB[sharedName]
+            if sharedData and self:IsSpellEnabled(sharedName, playerInfo.team, playerInfo.class) then
+                local sharedDur = cdData.sharedCDDuration or duration
+                -- Only apply shared CD if it would be longer than current remaining
+                local existing = playerInfo.cooldowns[sharedName]
+                if not existing or (now + sharedDur) > existing.expirationTime then
+                    playerInfo.cooldowns[sharedName] = {
+                        startTime      = now,
+                        duration       = sharedDur,
+                        expirationTime = now + sharedDur,
+                        spellID        = sharedData.spellID,
+                        category       = sharedData.category,
+                    }
+                    self:Debug("  Shared CD: " .. sharedName .. " (" .. sharedDur .. "s)")
+                end
             end
         end
     end

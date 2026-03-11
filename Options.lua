@@ -82,7 +82,7 @@ function addon:BuildOptionsContent(parent)
 
     -- Build internal tab buttons
     local tabNames = { "General", "Party", "Enemy", "Test" }
-    local TAB_H = 26
+    local TAB_H = 30
     local TAB_START_Y = -36
 
     sidebarButtons = {}
@@ -101,13 +101,13 @@ function addon:BuildOptionsContent(parent)
         local indicator = tab:CreateTexture(nil, "OVERLAY")
         indicator:SetPoint("TOPLEFT", 0, 0)
         indicator:SetPoint("BOTTOMLEFT", 0, 0)
-        indicator:SetWidth(2)
+        indicator:SetWidth(3)
         indicator:SetColorTexture(0, 0, 0, 0)
         tab.indicator = indicator
 
         local text = tab:CreateFontString(nil, "OVERLAY")
-        text:SetFont(addon.FONT_BODY, 10, "")
-        text:SetPoint("LEFT", 12, 0)
+        text:SetFont(addon.FONT_BODY, 11, "")
+        text:SetPoint("LEFT", 16, 0)
         text:SetText(name)
         text:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
         tab.text = text
@@ -218,95 +218,33 @@ function addon:ShowImportExportDialog(mode)
         status:SetText("")
         f.status = status
 
-        -- Export button
-        local exportBtn = CreateFrame("Button", nil, f)
-        exportBtn:SetSize(140, 26)
-        exportBtn:SetPoint("BOTTOMLEFT", 14, 8)
-
-        local eBg = exportBtn:CreateTexture(nil, "BACKGROUND")
-        eBg:SetAllPoints()
-        eBg:SetColorTexture(0.078, 0.078, 0.086, 1)
-
-        local eBorder = exportBtn:CreateTexture(nil, "ARTWORK")
-        eBorder:SetPoint("TOPLEFT", -1, 1)
-        eBorder:SetPoint("BOTTOMRIGHT", 1, -1)
-        eBorder:SetColorTexture(C.divider[1], C.divider[2], C.divider[3], C.divider[4])
-
-        local eInner = exportBtn:CreateTexture(nil, "ARTWORK", nil, 1)
-        eInner:SetAllPoints()
-        eInner:SetColorTexture(0.078, 0.078, 0.086, 1)
-
-        local eLabel = exportBtn:CreateFontString(nil, "OVERLAY")
-        eLabel:SetFont(addon.FONT_BODY, 10, "")
-        eLabel:SetPoint("CENTER", 0, 0)
-        eLabel:SetText("Export")
-        eLabel:SetTextColor(C.textNormal[1], C.textNormal[2], C.textNormal[3])
-
-        exportBtn:SetScript("OnEnter", function()
-            eInner:SetColorTexture(C.tabActive[1], C.tabActive[2], C.tabActive[3], 1)
-            eLabel:SetTextColor(C.accent[1], C.accent[2], C.accent[3])
-        end)
-        exportBtn:SetScript("OnLeave", function()
-            eInner:SetColorTexture(0.078, 0.078, 0.086, 1)
-            eLabel:SetTextColor(C.textNormal[1], C.textNormal[2], C.textNormal[3])
-        end)
-        exportBtn:SetScript("OnClick", function()
+        -- Export button (BOTTOMLEFT → TOPLEFT conversion: 320 - 8 - 24 = 288)
+        local exportBtn = lib:CreateButton(f, 14, -288, 140, "Export", function()
             local str = addon:ExportConfig()
             if str then
                 f.editBox:SetText(str)
                 f.editBox:HighlightText()
                 f.editBox:SetFocus()
-                f.status:SetTextColor(0.29, 0.87, 0.50)
+                f.status:SetTextColor(C.statusSuccess[1], C.statusSuccess[2], C.statusSuccess[3])
                 f.status:SetText("Config exported. Press Ctrl+C to copy.")
             else
-                f.status:SetTextColor(0.90, 0.22, 0.22)
+                f.status:SetTextColor(C.statusError[1], C.statusError[2], C.statusError[3])
                 f.status:SetText("Export failed: no config loaded.")
             end
         end)
         f.exportBtn = exportBtn
 
         -- Import button
-        local importBtn = CreateFrame("Button", nil, f)
-        importBtn:SetSize(140, 26)
-        importBtn:SetPoint("BOTTOMLEFT", exportBtn, "BOTTOMRIGHT", 10, 0)
-
-        local iBg = importBtn:CreateTexture(nil, "BACKGROUND")
-        iBg:SetAllPoints()
-        iBg:SetColorTexture(0.078, 0.078, 0.086, 1)
-
-        local iBorder = importBtn:CreateTexture(nil, "ARTWORK")
-        iBorder:SetPoint("TOPLEFT", -1, 1)
-        iBorder:SetPoint("BOTTOMRIGHT", 1, -1)
-        iBorder:SetColorTexture(C.divider[1], C.divider[2], C.divider[3], C.divider[4])
-
-        local iInner = importBtn:CreateTexture(nil, "ARTWORK", nil, 1)
-        iInner:SetAllPoints()
-        iInner:SetColorTexture(0.078, 0.078, 0.086, 1)
-
-        local iLabel = importBtn:CreateFontString(nil, "OVERLAY")
-        iLabel:SetFont(addon.FONT_BODY, 10, "")
-        iLabel:SetPoint("CENTER", 0, 0)
-        iLabel:SetText("Import")
-        iLabel:SetTextColor(C.textNormal[1], C.textNormal[2], C.textNormal[3])
-
-        importBtn:SetScript("OnEnter", function()
-            iInner:SetColorTexture(C.tabActive[1], C.tabActive[2], C.tabActive[3], 1)
-            iLabel:SetTextColor(C.accent[1], C.accent[2], C.accent[3])
-        end)
-        importBtn:SetScript("OnLeave", function()
-            iInner:SetColorTexture(0.078, 0.078, 0.086, 1)
-            iLabel:SetTextColor(C.textNormal[1], C.textNormal[2], C.textNormal[3])
-        end)
-        importBtn:SetScript("OnClick", function()
+        local importBtn = lib:CreateButton(f, 164, -288, 140, "Import", function()
             local text = f.editBox:GetText()
             if not text or text == "" then
-                f.status:SetTextColor(0.90, 0.22, 0.22)
+                f.status:SetTextColor(C.statusError[1], C.statusError[2], C.statusError[3])
                 f.status:SetText("Paste a config string first.")
                 return
             end
             local success, warnOrErr = addon:ImportConfig(text)
             if success then
-                f.status:SetTextColor(0.29, 0.87, 0.50)
+                f.status:SetTextColor(C.statusSuccess[1], C.statusSuccess[2], C.statusSuccess[3])
                 if warnOrErr then
                     f.status:SetText("Config imported with warnings. /reload to refresh options.")
                     addon:Print("Import warnings:\n" .. warnOrErr)
@@ -315,7 +253,7 @@ function addon:ShowImportExportDialog(mode)
                 end
                 addon:Print("Config imported successfully.")
             else
-                f.status:SetTextColor(0.90, 0.22, 0.22)
+                f.status:SetTextColor(C.statusError[1], C.statusError[2], C.statusError[3])
                 f.status:SetText(warnOrErr or "Import failed.")
             end
         end)
@@ -337,7 +275,7 @@ function addon:ShowImportExportDialog(mode)
                 f.editBox:HighlightText()
                 f.editBox:SetFocus()
             end)
-            f.status:SetTextColor(0.29, 0.87, 0.50)
+            f.status:SetTextColor(C.statusSuccess[1], C.statusSuccess[2], C.statusSuccess[3])
             f.status:SetText("Press Ctrl+C to copy the config string.")
         end
     else
@@ -519,7 +457,7 @@ local function CreateInnerTabs(parent, tabLabels)
 
     local tabBarBg = tabBar:CreateTexture(nil, "BACKGROUND")
     tabBarBg:SetAllPoints()
-    tabBarBg:SetColorTexture(0.039, 0.039, 0.039, 0.8)
+    tabBarBg:SetColorTexture(C.sidebarBg[1], C.sidebarBg[2], C.sidebarBg[3], 0.8)
 
     local sep = tabBar:CreateTexture(nil, "ARTWORK")
     sep:SetPoint("BOTTOMLEFT", 0, 0)
@@ -780,7 +718,7 @@ local function GetOrCreateGridSlot(state, index, parent)
     -- Background
     slot.bg = slot:CreateTexture(nil, "BACKGROUND")
     slot.bg:SetAllPoints()
-    slot.bg:SetColorTexture(0.078, 0.078, 0.086, 1)
+    slot.bg:SetColorTexture(C.frameBg[1], C.frameBg[2], C.frameBg[3], 1)
 
     -- Spell icon
     slot.icon = slot:CreateTexture(nil, "ARTWORK")
@@ -807,7 +745,7 @@ local function GetOrCreateGridSlot(state, index, parent)
 
     -- Empty slot "+" text
     slot.emptyText = slot:CreateFontString(nil, "OVERLAY")
-    slot.emptyText:SetFont(addon.FONT_DISPLAY, 16, "OUTLINE")
+    slot.emptyText:SetFont(addon.FONT_DISPLAY, 18, "OUTLINE")
     slot.emptyText:SetPoint("CENTER")
     slot.emptyText:SetText("+")
     slot.emptyText:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
@@ -1048,7 +986,7 @@ function addon:RefreshGridDisplay(team, state)
             end)
             slot:SetScript("OnLeave", function()
                 GameTooltip:Hide()
-                slot.bg:SetColorTexture(0.078, 0.078, 0.086, 1)
+                slot.bg:SetColorTexture(C.frameBg[1], C.frameBg[2], C.frameBg[3], 1)
             end)
             slot:SetScript("OnMouseDown", nil)
 
@@ -1260,7 +1198,7 @@ local function UpdateGridFilterButtons(state)
                 btn.bg:SetColorTexture(cc.r * 0.15, cc.g * 0.15, cc.b * 0.15, 0.7)
                 btn.text:SetTextColor(cc.r * 0.6, cc.g * 0.6, cc.b * 0.6)
             else
-                btn.bg:SetColorTexture(0.078, 0.078, 0.086, 0.9)
+                btn.bg:SetColorTexture(C.frameBg[1], C.frameBg[2], C.frameBg[3], 0.9)
                 btn.text:SetTextColor(0.50, 0.50, 0.50)
             end
         end
@@ -1279,7 +1217,7 @@ local function PopulateGridBuilder(parent, team, state)
 
     local filterBarBg = filterBar:CreateTexture(nil, "BACKGROUND")
     filterBarBg:SetAllPoints()
-    filterBarBg:SetColorTexture(0.039, 0.039, 0.039, 0.8)
+    filterBarBg:SetColorTexture(C.sidebarBg[1], C.sidebarBg[2], C.sidebarBg[3], 0.8)
 
     local classFilters = {
         { key = "Warrior",  label = "War" },
@@ -1314,7 +1252,7 @@ local function PopulateGridBuilder(parent, team, state)
         if cc then
             bg:SetColorTexture(cc.r * 0.15, cc.g * 0.15, cc.b * 0.15, 0.7)
         else
-            bg:SetColorTexture(0.078, 0.078, 0.086, 0.9)
+            bg:SetColorTexture(C.frameBg[1], C.frameBg[2], C.frameBg[3], 0.9)
         end
 
         local text = btn:CreateFontString(nil, "OVERLAY")
@@ -1391,7 +1329,7 @@ local function PopulateGridBuilder(parent, team, state)
 
         local bg = btn:CreateTexture(nil, "BACKGROUND")
         bg:SetAllPoints()
-        bg:SetColorTexture(0.078, 0.078, 0.086, 0.9)
+        bg:SetColorTexture(C.frameBg[1], C.frameBg[2], C.frameBg[3], 0.9)
         btn.bg = bg
 
         local border = btn:CreateTexture(nil, "ARTWORK")
@@ -1402,7 +1340,7 @@ local function PopulateGridBuilder(parent, team, state)
 
         local inner = btn:CreateTexture(nil, "ARTWORK", nil, 1)
         inner:SetAllPoints()
-        inner:SetColorTexture(0.078, 0.078, 0.086, 0.9)
+        inner:SetColorTexture(C.frameBg[1], C.frameBg[2], C.frameBg[3], 0.9)
         btn.inner = inner
 
         local text = btn:CreateFontString(nil, "OVERLAY")
@@ -1417,7 +1355,7 @@ local function PopulateGridBuilder(parent, team, state)
             text:SetTextColor(C.accent[1], C.accent[2], C.accent[3])
         end)
         btn:SetScript("OnLeave", function()
-            inner:SetColorTexture(0.078, 0.078, 0.086, 0.9)
+            inner:SetColorTexture(C.frameBg[1], C.frameBg[2], C.frameBg[3], 0.9)
             text:SetTextColor(C.textNormal[1], C.textNormal[2], C.textNormal[3])
         end)
 
@@ -1547,7 +1485,7 @@ local function PopulateGridBuilder(parent, team, state)
 
     local gridAreaBg = gridArea:CreateTexture(nil, "BACKGROUND")
     gridAreaBg:SetAllPoints()
-    gridAreaBg:SetColorTexture(0.039, 0.039, 0.039, 0.6)
+    gridAreaBg:SetColorTexture(C.sidebarBg[1], C.sidebarBg[2], C.sidebarBg[3], 0.6)
 
     local gridLabel = gridArea:CreateFontString(nil, "OVERLAY")
     gridLabel:SetFont(addon.FONT_DISPLAY, 9, "")

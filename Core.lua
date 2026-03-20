@@ -9,7 +9,7 @@ local addon = TrinketedCD
 -- Constants
 ---------------------------------------------------------------------------
 addon.ADDON_NAME = "TrinketedCD"
-addon.VERSION = C_AddOns.GetAddOnMetadata("TrinketedCD", "Version") or "@project-version@"
+addon.VERSION = LibStub("TrinketedLib-1.0"):GetVersion("TrinketedCD")
 
 local TrinketedLib = LibStub("TrinketedLib-1.0")
 addon.FONT_DISPLAY = TrinketedLib.FONT_DISPLAY

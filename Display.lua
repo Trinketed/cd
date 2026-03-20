@@ -666,9 +666,9 @@ function addon:UpdatePlayerBar(guid)
                     end
 
                     if icon then
-                        -- Tight packing when compact mode or spec filtering removes slots
+                        -- Tight packing only in compact mode; spec-filtered icons keep fixed grid slots
                         local col, row
-                        if compactMode or info.spec then
+                        if compactMode then
                             col = (visibleCount % cols) + 1
                             row = math.floor(visibleCount / cols) + 1
                         else
@@ -765,8 +765,8 @@ function addon:UpdatePlayerBar(guid)
     end
 
     -- Resize bar to fit grid
-    if compactMode or info.spec then
-        -- Compact/spec-filtered: size to visible icons only
+    if compactMode then
+        -- Compact: size to visible icons only
         bar:SetSize(
             maxCol * (size + padding) - padding,
             maxRow * (size + padding) - padding)

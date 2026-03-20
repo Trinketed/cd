@@ -13,7 +13,19 @@ function addon:ScanPartyMembers()
 
     -- Hide in raids (any size) unless we're in an arena instance
     local inArenaInstance = (select(2, IsInInstance()) == "arena")
-    if IsInRaid() and not inArenaInstance then return end
+    if IsInRaid() and not inArenaInstance then
+        for guid, info in pairs(self.state.trackedPlayers) do
+            if info.team == "party" and not tostring(guid):match("^test_") then
+                self.state.trackedPlayers[guid] = nil
+                self.state.guidMap[guid] = nil
+                self:DestroyBar(guid)
+            end
+        end
+        for i = 1, 4 do
+            self.state.unitMap["party" .. i] = nil
+        end
+        return
+    end
 
     -- Build new set of party members, preserving existing state
     local newGUIDs = {}

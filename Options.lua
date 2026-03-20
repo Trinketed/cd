@@ -8,34 +8,11 @@ local lib = LibStub("TrinketedLib-1.0")
 local C = lib.C
 
 local optionsFrame = nil
-local contentFrames = {}
-local sidebarButtons = {}
 
 -- Per-team grid builder state
 local gridBuilderState = {
     party = { currentClass = "Warrior", gridSlotPool = {}, poolRowPool = {}, scrollChild = nil, gridParent = nil, filterButtons = {}, searchText = "" },
 }
-
----------------------------------------------------------------------------
--- Sidebar Tab Selection
----------------------------------------------------------------------------
-local function SelectTab(index)
-    for i, btn in ipairs(sidebarButtons) do
-        if i == index then
-            btn.bg:SetColorTexture(C.tabActive[1], C.tabActive[2], C.tabActive[3], C.tabActive[4])
-            btn.indicator:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 1)
-            btn.text:SetTextColor(C.textBright[1], C.textBright[2], C.textBright[3])
-            btn.isActive = true
-            if contentFrames[i] then contentFrames[i]:Show() end
-        else
-            btn.bg:SetColorTexture(0, 0, 0, 0)
-            btn.indicator:SetColorTexture(0, 0, 0, 0)
-            btn.text:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
-            btn.isActive = false
-            if contentFrames[i] then contentFrames[i]:Hide() end
-        end
-    end
-end
 
 ---------------------------------------------------------------------------
 -- Init Options
@@ -50,101 +27,36 @@ function addon:InitOptions()
 end
 
 function addon:BuildOptionsContent(parent)
-    -- Internal sub-tab sidebar for TrinketedCD's own tabs
-    local INNER_TAB_W = 90
-    local innerSidebar = CreateFrame("Frame", nil, parent)
-    innerSidebar:SetPoint("TOPLEFT", 0, 0)
-    innerSidebar:SetPoint("BOTTOMLEFT", 0, 0)
-    innerSidebar:SetWidth(INNER_TAB_W)
+    local tabBar = lib:CreateTabBar(parent, {
+        { "settings", "Settings" },
+        { "spells", "Spells" },
+        { "test", "Test" },
+    }, {
+        height = 26,
+        tabWidth = 80,
+    })
 
-    local innerBg = innerSidebar:CreateTexture(nil, "BACKGROUND")
-    innerBg:SetAllPoints()
-    innerBg:SetColorTexture(C.sidebarBg[1], C.sidebarBg[2], C.sidebarBg[3], 0.5)
+    -- Right-aligned bar items: import/export
+    local exportBtn = lib:CreateButton(tabBar.frame, 0, 0, 60, "Export", function()
+        addon:ShowImportExportDialog("export")
+    end)
+    exportBtn:ClearAllPoints()
+    exportBtn:SetPoint("RIGHT", tabBar.frame, "RIGHT", -36, 0)
+    exportBtn:SetSize(60, 18)
 
-    -- Version text at top of inner sidebar
-    local verText = innerSidebar:CreateFontString(nil, "OVERLAY")
-    verText:SetFont(addon.FONT_MONO, 9, "")
-    verText:SetPoint("TOP", innerSidebar, "TOP", 0, -10)
-    verText:SetText("CD v" .. addon.VERSION)
-    verText:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
-
-    local innerSep = innerSidebar:CreateTexture(nil, "ARTWORK")
-    innerSep:SetPoint("TOPLEFT", innerSidebar, "TOPLEFT", 8, -28)
-    innerSep:SetPoint("TOPRIGHT", innerSidebar, "TOPRIGHT", -8, -28)
-    innerSep:SetHeight(1)
-    innerSep:SetColorTexture(C.divider[1], C.divider[2], C.divider[3], C.divider[4])
-
-    -- Inner content area
-    local innerContent = CreateFrame("Frame", nil, parent)
-    innerContent:SetPoint("TOPLEFT", innerSidebar, "TOPRIGHT", 0, 0)
-    innerContent:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
-
-    -- Build internal tab buttons
-    local tabNames = { "General", "Party", "Test" }
-    local TAB_H = 30
-    local TAB_START_Y = -36
-
-    sidebarButtons = {}
-    contentFrames = {}
-
-    for i, name in ipairs(tabNames) do
-        local tab = CreateFrame("Button", nil, innerSidebar)
-        tab:SetSize(INNER_TAB_W, TAB_H)
-        tab:SetPoint("TOPLEFT", 0, TAB_START_Y - (i - 1) * TAB_H)
-
-        local bg = tab:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints()
-        bg:SetColorTexture(0, 0, 0, 0)
-        tab.bg = bg
-
-        local indicator = tab:CreateTexture(nil, "OVERLAY")
-        indicator:SetPoint("TOPLEFT", 0, 0)
-        indicator:SetPoint("BOTTOMLEFT", 0, 0)
-        indicator:SetWidth(3)
-        indicator:SetColorTexture(0, 0, 0, 0)
-        tab.indicator = indicator
-
-        local text = tab:CreateFontString(nil, "OVERLAY")
-        text:SetFont(addon.FONT_BODY, 11, "")
-        text:SetPoint("LEFT", 16, 0)
-        text:SetText(name)
-        text:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
-        tab.text = text
-
-        tab.isActive = false
-
-        tab:SetScript("OnEnter", function()
-            if not tab.isActive then
-                bg:SetColorTexture(C.tabHover[1], C.tabHover[2], C.tabHover[3], C.tabHover[4])
-                text:SetTextColor(C.textNormal[1], C.textNormal[2], C.textNormal[3])
-            end
-        end)
-        tab:SetScript("OnLeave", function()
-            if not tab.isActive then
-                bg:SetColorTexture(0, 0, 0, 0)
-                text:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
-            end
-        end)
-        tab:SetScript("OnClick", function()
-            SelectTab(i)
-        end)
-
-        sidebarButtons[i] = tab
-
-        -- Create content frame for this tab
-        local cf = CreateFrame("Frame", nil, innerContent)
-        cf:SetAllPoints(innerContent)
-        cf:Hide()
-        contentFrames[i] = cf
-    end
+    local importBtn = lib:CreateButton(tabBar.frame, 0, 0, 60, "Import", function()
+        addon:ShowImportExportDialog("import")
+    end)
+    importBtn:ClearAllPoints()
+    importBtn:SetPoint("RIGHT", exportBtn, "LEFT", -4, 0)
+    importBtn:SetSize(60, 18)
 
     -- Populate tab contents
-    self:PopulateGeneralTab(contentFrames[1])
-    self:PopulatePartyTab(contentFrames[2])
-    self:PopulateTestModeTab(contentFrames[3])
+    self:PopulateSettingsTab(tabBar.contents["settings"])
+    self:PopulateSpellsTab(tabBar.contents["spells"])
+    self:PopulateTestModeTab(tabBar.contents["test"])
 
-    -- Select first tab
-    SelectTab(1)
+    tabBar:SelectTab("settings")
 end
 
 ---------------------------------------------------------------------------
@@ -292,39 +204,79 @@ function addon:ShowOptions()
 end
 
 ---------------------------------------------------------------------------
--- General Tab
+-- Settings Tab (merged General + Party settings)
 ---------------------------------------------------------------------------
-function addon:PopulateGeneralTab(parent)
+function addon:PopulateSettingsTab(parent)
     local y = -10
-
-    y = lib:CreateSectionHeader(parent, y, "DISPLAY")
-    y = y - 4
-
-    -- VISUAL EFFECTS section
-    y = lib:CreateSectionHeader(parent, y, "VISUAL EFFECTS")
-    y = y - 4
-
     local col1 = 10
     local col2 = 270
 
-    lib:CreateCheckbox(parent, col1, y, "Glow when CD expires",
-        self.db.general.showGlowOnReady, function(checked)
-            self.db.general.showGlowOnReady = checked
+    -- TRACKING section
+    y = lib:CreateSectionHeader(parent, y, "TRACKING")
+    y = y - 4
+
+    lib:CreateCheckbox(parent, col1, y, "Enable party cooldown tracking",
+        self.db.party.enabled, function(checked)
+            self.db.party.enabled = checked
+            self:RefreshAllBars()
         end)
-    lib:CreateCheckbox(parent, col2, y, "Flash when ability used",
-        self.db.general.showFlashOnUse, function(checked)
-            self.db.general.showFlashOnUse = checked
+    lib:CreateCheckbox(parent, col2, y, "Track outside arena",
+        self.db.general.trackOutsideArena, function(checked)
+            self.db.general.trackOutsideArena = checked
+            if checked and not addon.state.inArena then
+                addon:ScanPartyMembers()
+                addon:ScanPetOwners()
+                addon:RefreshAllBars()
+            end
         end)
     y = y - 24
 
-    lib:CreateCheckbox(parent, col1, y, "Pulse border on low timer",
-        self.db.general.showPulseOnLow, function(checked)
-            self.db.general.showPulseOnLow = checked
+    local lockToggle = lib:CreateCheckbox(parent, col1, y, "Bars locked",
+        self.db.general.locked, function(on)
+            if on ~= self.db.general.locked then
+                addon:ToggleLock()
+            end
         end)
-    lib:CreateCheckbox(parent, col2, y, "Show player name labels",
+    self._lockToggles = self._lockToggles or {}
+    self._lockToggles[#self._lockToggles + 1] = lockToggle
+
+    lib:CreateButton(parent, col2, y, 150, "Reset Positions", function()
+        addon:ResetAllPositions()
+    end)
+    y = y - 24
+
+    lib:CreateCheckbox(parent, col1, y, "Debug output",
+        self.db.debug, function(checked)
+            self.db.debug = checked
+        end)
+    y = y - 28
+
+    -- APPEARANCE section
+    y = lib:CreateSectionHeader(parent, y, "APPEARANCE")
+    y = y - 4
+
+    lib:CreateSlider(parent, col1, y, "Icon Size", 16, 48, 2,
+        self.db.party.iconSize, function(val)
+            self.db.party.iconSize = val
+            self:RefreshAllBars()
+        end)
+    y = y - 42
+
+    lib:CreateCheckbox(parent, col1, y, "Compact mode (active CDs only)",
+        self.db.general.compactMode, function(checked)
+            self.db.general.compactMode = checked
+            self:RefreshAllBars()
+        end)
+    lib:CreateCheckbox(parent, col2, y, "Show category borders",
+        self.db.general.showIconBorders, function(checked)
+            self.db.general.showIconBorders = checked
+            self:RefreshAllBars()
+        end)
+    y = y - 24
+
+    lib:CreateCheckbox(parent, col1, y, "Show player name labels",
         self.db.general.showPlayerLabels, function(checked)
             self.db.general.showPlayerLabels = checked
-            -- Update name label visibility on all bars
             local locked = self.db.general.locked
             for guid, bar in pairs(self.bars) do
                 local info = self.state.trackedPlayers[guid]
@@ -339,32 +291,25 @@ function addon:PopulateGeneralTab(parent)
                 end
             end
         end)
-    y = y - 24
-
-    lib:CreateCheckbox(parent, col1, y, "Compact mode (active CDs only)",
-        self.db.general.compactMode, function(checked)
-            self.db.general.compactMode = checked
-            self:RefreshAllBars()
-        end)
-    lib:CreateCheckbox(parent, col2, y, "Show category borders",
-        self.db.general.showIconBorders, function(checked)
-            self.db.general.showIconBorders = checked
-            self:RefreshAllBars()
-        end)
-    y = y - 24
-
-    lib:CreateCheckbox(parent, col1, y, "Show spell tooltips on hover",
+    lib:CreateCheckbox(parent, col2, y, "Show spell tooltips on hover",
         self.db.general.showSpellTooltips, function(checked)
             self.db.general.showSpellTooltips = checked
         end)
-    lib:CreateCheckbox(parent, col2, y, "Track outside arena",
-        self.db.general.trackOutsideArena, function(checked)
-            self.db.general.trackOutsideArena = checked
-            if checked and not addon.state.inArena then
-                addon:ScanPartyMembers()
-                addon:ScanPetOwners()
-                addon:RefreshAllBars()
-            end
+    y = y - 24
+
+    lib:CreateCheckbox(parent, col1, y, "Glow when CD expires",
+        self.db.general.showGlowOnReady, function(checked)
+            self.db.general.showGlowOnReady = checked
+        end)
+    lib:CreateCheckbox(parent, col2, y, "Flash when ability used",
+        self.db.general.showFlashOnUse, function(checked)
+            self.db.general.showFlashOnUse = checked
+        end)
+    y = y - 24
+
+    lib:CreateCheckbox(parent, col1, y, "Pulse border on low timer",
+        self.db.general.showPulseOnLow, function(checked)
+            self.db.general.showPulseOnLow = checked
         end)
     y = y - 28
 
@@ -411,112 +356,53 @@ function addon:PopulateGeneralTab(parent)
         ColorPickerFrame:Show()
     end)
 
-    y = y - 30
-
-    -- ACTIONS section
-    y = lib:CreateSectionHeader(parent, y, "ACTIONS")
-    y = y - 4
-
-    local lockToggle = lib:CreateCheckbox(parent, 10, y, "Bars locked",
-        self.db.general.locked, function(on)
-            if on ~= self.db.general.locked then
-                addon:ToggleLock()
-            end
-        end)
-    self._lockToggles = self._lockToggles or {}
-    self._lockToggles[#self._lockToggles + 1] = lockToggle
-
-    lib:CreateButton(parent, 200, y, 150, "Reset Positions", function()
-        addon:ResetAllPositions()
-    end)
     y = y - 34
 
-    lib:CreateCheckbox(parent, 10, y, "Debug output",
-        self.db.debug, function(checked)
-            self.db.debug = checked
+    -- POSITION section
+    y = lib:CreateSectionHeader(parent, y, "POSITION")
+    y = y - 4
+
+    lib:CreateCheckbox(parent, col1, y, "Anchor to party unit frames",
+        self.db.party.anchorToFrames, function(checked)
+            self.db.party.anchorToFrames = checked
+            self:RefreshAllBars()
         end)
-end
+    y = y - 32
 
----------------------------------------------------------------------------
--- Inner Tab Helper (Settings / Spells sub-tabs within Party & Enemy)
----------------------------------------------------------------------------
-local function CreateInnerTabs(parent, tabLabels)
-    local TAB_BAR_H = 26
+    -- Anchor side buttons (LEFT / RIGHT)
+    local sideLabel = parent:CreateFontString(nil, "OVERLAY")
+    sideLabel:SetFont(addon.FONT_BODY, 10, "")
+    sideLabel:SetPoint("TOPLEFT", col1, y)
+    sideLabel:SetText("Anchor Side:")
+    sideLabel:SetTextColor(C.textNormal[1], C.textNormal[2], C.textNormal[3])
 
-    local tabBar = CreateFrame("Frame", nil, parent)
-    tabBar:SetPoint("TOPLEFT", 0, 0)
-    tabBar:SetPoint("TOPRIGHT", 0, 0)
-    tabBar:SetHeight(TAB_BAR_H)
+    lib:CreateButton(parent, 100, y, 60, "Left", function()
+        self.db.party.anchorSide = "LEFT"
+        self:RefreshAllBars()
+    end)
+    lib:CreateButton(parent, 166, y, 60, "Right", function()
+        self.db.party.anchorSide = "RIGHT"
+        self:RefreshAllBars()
+    end)
+    y = y - 32
 
-    local tabBarBg = tabBar:CreateTexture(nil, "BACKGROUND")
-    tabBarBg:SetAllPoints()
-    tabBarBg:SetColorTexture(C.sidebarBg[1], C.sidebarBg[2], C.sidebarBg[3], 0.8)
-
-    local sep = tabBar:CreateTexture(nil, "ARTWORK")
-    sep:SetPoint("BOTTOMLEFT", 0, 0)
-    sep:SetPoint("BOTTOMRIGHT", 0, 0)
-    sep:SetHeight(1)
-    sep:SetColorTexture(C.divider[1], C.divider[2], C.divider[3], C.divider[4])
-
-    local subContents = {}
-    local subButtons = {}
-
-    local function SelectInnerTab(index)
-        for i, btn in ipairs(subButtons) do
-            if i == index then
-                btn.indicator:Show()
-                btn.text:SetTextColor(C.textBright[1], C.textBright[2], C.textBright[3])
-                if subContents[i] then subContents[i]:Show() end
-            else
-                btn.indicator:Hide()
-                btn.text:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
-                if subContents[i] then subContents[i]:Hide() end
-            end
-        end
-    end
-
-    local BTN_W = 80
-    for i, label in ipairs(tabLabels) do
-        local btn = CreateFrame("Button", nil, tabBar)
-        btn:SetSize(BTN_W, TAB_BAR_H)
-        btn:SetPoint("TOPLEFT", (i - 1) * BTN_W, 0)
-
-        btn.text = btn:CreateFontString(nil, "OVERLAY")
-        btn.text:SetFont(addon.FONT_BODY, 10, "")
-        btn.text:SetPoint("CENTER", 0, 1)
-        btn.text:SetText(label)
-        btn.text:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
-
-        btn.indicator = btn:CreateTexture(nil, "OVERLAY")
-        btn.indicator:SetPoint("BOTTOMLEFT", 4, 0)
-        btn.indicator:SetPoint("BOTTOMRIGHT", -4, 0)
-        btn.indicator:SetHeight(2)
-        btn.indicator:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 1)
-        btn.indicator:Hide()
-
-        btn:SetScript("OnEnter", function()
-            if not btn.indicator:IsShown() then
-                btn.text:SetTextColor(C.textNormal[1], C.textNormal[2], C.textNormal[3])
-            end
+    lib:CreateSlider(parent, col1, y, "Anchor Offset X", -50, 50, 1,
+        self.db.party.anchorOffsetX, function(val)
+            self.db.party.anchorOffsetX = val
+            self:RefreshAllBars()
         end)
-        btn:SetScript("OnLeave", function()
-            if not btn.indicator:IsShown() then
-                btn.text:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
-            end
+    lib:CreateSlider(parent, 300, y, "Anchor Offset Y", -50, 50, 1,
+        self.db.party.anchorOffsetY, function(val)
+            self.db.party.anchorOffsetY = val
+            self:RefreshAllBars()
         end)
-        btn:SetScript("OnClick", function() SelectInnerTab(i) end)
+    y = y - 48
 
-        subButtons[i] = btn
-
-        local content = CreateFrame("Frame", nil, parent)
-        content:SetPoint("TOPLEFT", 0, -TAB_BAR_H)
-        content:SetPoint("BOTTOMRIGHT", 0, 0)
-        content:Hide()
-        subContents[i] = content
-    end
-
-    SelectInnerTab(1)
-    return subContents
+    lib:CreateButton(parent, col1, y, 180, "Reset Party Positions", function()
+        wipe(self.db.party.positions)
+        self:RefreshAllBars()
+        self:Print("Party bar positions reset.")
+    end)
 end
 
 ---------------------------------------------------------------------------
@@ -1549,101 +1435,11 @@ end
 ---------------------------------------------------------------------------
 -- Party Tab (Settings / Spells inner tabs)
 ---------------------------------------------------------------------------
-function addon:PopulatePartyTab(parent)
-    local subContents = CreateInnerTabs(parent, { "Settings", "Spells" })
-
-    -- Settings sub-tab
-    local sp = subContents[1]
-    local y = -10
-
-    y = lib:CreateSectionHeader(sp, y, "PARTY COOLDOWN BARS")
-    y = y - 4
-
-    lib:CreateCheckbox(sp, 10, y, "Enable party cooldown tracking",
-        self.db.party.enabled, function(checked)
-            self.db.party.enabled = checked
-            self:RefreshAllBars()
-        end)
-    y = y - 32
-
-    lib:CreateSlider(sp, 10, y, "Icon Size", 16, 48, 2,
-        self.db.party.iconSize, function(val)
-            self.db.party.iconSize = val
-            self:RefreshAllBars()
-        end)
-    y = y - 42
-
-    y = lib:CreateSectionHeader(sp, y, "PARTY FRAME ANCHORING")
-    y = y - 4
-
-    lib:CreateCheckbox(sp, 10, y, "Anchor to party unit frames",
-        self.db.party.anchorToFrames, function(checked)
-            self.db.party.anchorToFrames = checked
-            self:RefreshAllBars()
-        end)
-    y = y - 32
-
-    -- Anchor side buttons (LEFT / RIGHT)
-    local sideLabel = sp:CreateFontString(nil, "OVERLAY")
-    sideLabel:SetFont(addon.FONT_BODY, 10, "")
-    sideLabel:SetPoint("TOPLEFT", 10, y)
-    sideLabel:SetText("Anchor Side:")
-    sideLabel:SetTextColor(C.textNormal[1], C.textNormal[2], C.textNormal[3])
-
-    local leftBtn = lib:CreateButton(sp, 100, y, 60, "Left", function()
-        self.db.party.anchorSide = "LEFT"
-        self:RefreshAllBars()
-    end)
-    lib:CreateButton(sp, 166, y, 60, "Right", function()
-        self.db.party.anchorSide = "RIGHT"
-        self:RefreshAllBars()
-    end)
-    y = y - 32
-
-    lib:CreateSlider(sp, 10, y, "Anchor Offset X", -50, 50, 1,
-        self.db.party.anchorOffsetX, function(val)
-            self.db.party.anchorOffsetX = val
-            self:RefreshAllBars()
-        end)
-    y = y - 42
-
-    lib:CreateSlider(sp, 10, y, "Anchor Offset Y", -50, 50, 1,
-        self.db.party.anchorOffsetY, function(val)
-            self.db.party.anchorOffsetY = val
-            self:RefreshAllBars()
-        end)
-    y = y - 48
-
-    y = lib:CreateSectionHeader(sp, y, "POSITIONING")
-    y = y - 2
-
-    local dragHint = sp:CreateFontString(nil, "OVERLAY")
-    dragHint:SetFont(addon.FONT_BODY, 10, "")
-    dragHint:SetPoint("TOPLEFT", 10, y)
-    dragHint:SetWidth(520)
-    dragHint:SetJustifyH("LEFT")
-    dragHint:SetText("Unlock bars, then drag them to reposition. Lock when done. (Used when anchoring is off.)")
-    dragHint:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
-    y = y - 22
-
-    lib:CreateButton(sp, 10, y, 180, "Reset Party Positions", function()
-        wipe(self.db.party.positions)
-        self:RefreshAllBars()
-        self:Print("Party bar positions reset.")
-    end)
-    y = y - 38
-
-    y = lib:CreateSectionHeader(sp, y, "IMPORT / EXPORT")
-    y = y - 4
-    lib:CreateButton(sp, 10, y, 140, "Export Config", function()
-        addon:ShowImportExportDialog("export")
-    end)
-    lib:CreateButton(sp, 160, y, 140, "Import Config", function()
-        addon:ShowImportExportDialog("import")
-    end)
-
-    -- Spells sub-tab (Grid Builder)
-    PopulateGridBuilder(subContents[2], "party", gridBuilderState.party)
+---------------------------------------------------------------------------
+-- Spells Tab (Grid Builder, promoted from Party sub-tab)
+---------------------------------------------------------------------------
+function addon:PopulateSpellsTab(parent)
+    PopulateGridBuilder(parent, "party", gridBuilderState.party)
 end
 
 ---------------------------------------------------------------------------

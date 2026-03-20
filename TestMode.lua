@@ -45,9 +45,11 @@ function addon:ToggleTestMode()
         end
 
         self:CreateTestPlayers()
+        self:ShowBlizzardPartyFrames()
         self:RefreshAllBars()
     else
         self:Print("Test mode |cffff0000DISABLED|r")
+        self:HideBlizzardPartyFrames()
         self:ClearTestPlayers()
 
         -- Restore real players
@@ -149,6 +151,56 @@ function addon:ClearTestPlayers()
         self.state.guidMap[guid] = nil
         self:DestroyBar(guid)
     end
+end
+
+---------------------------------------------------------------------------
+-- Blizzard Party Frame Visibility (for test mode anchoring)
+---------------------------------------------------------------------------
+
+-- When solo, Blizzard party frames are hidden so FindUnitFrame() can't
+-- discover them. Following OmniCD's approach: force the real Blizzard compact
+-- unit frames visible during test mode so bars can anchor to them naturally.
+
+function addon:ShowBlizzardPartyFrames()
+    if not self.db or not self.db.party.anchorToFrames then return end
+    if InCombatLockdown() then return end
+
+    -- Don't show if already visible (player is in a real party)
+    if CompactRaidFrameContainer and CompactRaidFrameContainer:IsVisible() then
+        return
+    end
+
+    if CompactRaidFrameManager and CompactRaidFrameContainer then
+        CompactRaidFrameManager:Show()
+        CompactRaidFrameContainer:Show()
+        self.state.shownBlizzardFrames = true
+        self:Debug("Forced Blizzard compact party frames visible for test mode")
+    end
+end
+
+function addon:HideBlizzardPartyFrames()
+    if not self.state.shownBlizzardFrames then return end
+
+    if InCombatLockdown() then
+        -- Defer hiding until combat ends
+        if not self._hideFramesOnRegen then
+            self._hideFramesOnRegen = CreateFrame("Frame")
+            self._hideFramesOnRegen:SetScript("OnEvent", function(f)
+                f:UnregisterEvent("PLAYER_REGEN_ENABLED")
+                addon:HideBlizzardPartyFrames()
+            end)
+        end
+        self._hideFramesOnRegen:RegisterEvent("PLAYER_REGEN_ENABLED")
+        return
+    end
+
+    if CompactRaidFrameManager and CompactRaidFrameContainer then
+        CompactRaidFrameManager:Hide()
+        CompactRaidFrameContainer:Hide()
+    end
+
+    self.state.shownBlizzardFrames = nil
+    self:Debug("Hidden Blizzard compact party frames after test mode")
 end
 
 ---------------------------------------------------------------------------
